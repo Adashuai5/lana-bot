@@ -1,0 +1,11 @@
+[binance]
+api_key =""
+api_secret =""
+
+[gate]
+api_key = ""
+api_secret = ""
+
+[square]
+# Paste the cookie string from a logged-in binance.com session
+cookie = ""

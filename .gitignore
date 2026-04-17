@@ -1,0 +1,18 @@
+.venv/
+__pycache__/
+*.pyc
+.DS_Store
+
+# Secrets
+config/exchange.toml
+
+# Runtime data
+data/candidates/
+data/decisions/
+data/positions.json
+data/journal.ndjson
+logs/
+
+# IDE
+.idea/
+.vscode/

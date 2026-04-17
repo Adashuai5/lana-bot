@@ -1,0 +1,21 @@
+# Lana-bot strategy parameters
+# Edit freely; reloaded each cycle.
+
+live_trading = false            # MUST stay false until dry-run validation passes
+exchange = "binance"            # "binance" | "gate"
+initial_capital_usdt = 100
+max_stop_loss_per_position_usdt = 200
+max_concurrent_positions = 3
+position_size_usdt = 20         # notional size per position (before leverage)
+leverage = 10
+cycle_minutes = 30
+
+[filters]
+min_24h_volume_usdt = 5_000_000
+min_24h_change_pct = 10
+min_oi_change_1h_pct = 5
+top_n_candidates = 20
+
+[square]
+enabled = false                 # enable after square scraper is built
+top_n_trending = 20
