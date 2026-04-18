@@ -27,7 +27,7 @@ AI 辅助的 Binance 合约交易机器人。Claude 每 30 分钟作为决策层
 - **标的池**：24 小时涨幅强劲 + OI 上升的 Meme/小市值币种
 - **仓位规模**：20 USDT 保证金 × 10 倍杠杆 = 200 USDT 名义价值
 - **最大并发仓位**：3 个
-- **硬止损**：每仓亏损 −10 USDT（由监控守护进程强制执行）
+- **硬止损**：每仓未实现 PnL ≤ −10 USDT 时强平（由监控守护进程强制执行；PnL 按名义价值计算）
 - **候选评分公式**：`price_change_pct + oi_change_1h_pct×1.5 + log10(volume)×2 + square_mentions×3`
 
 ---
@@ -57,7 +57,7 @@ AI 辅助的 Binance 合约交易机器人。Claude 每 30 分钟作为决策层
 | 每日最大开仓次数 | 12 次 | circuit_breaker.py（开仓前） |
 | 止损冷却时间 | 任意止损触发后 60 分钟 | circuit_breaker.py（开仓前） |
 | 仓位上限 | 最多 3 个并发仓位 | execute.py |
-| 硬止损 | 未实现亏损 −10 USDT | monitor.py 守护进程 |
+| 硬止损 | 未实现 PnL ≤ −10 USDT（名义价值口径；当前参数下约等于保证金亏损 50%） | monitor.py 守护进程 |
 
 ---
 

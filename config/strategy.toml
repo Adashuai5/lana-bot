@@ -4,7 +4,11 @@
 live_trading = false            # MUST stay false until dry-run validation passes
 exchange = "binance"            # "binance" | "gate"
 initial_capital_usdt = 100
-max_stop_loss_per_position_usdt = 10    # 10% of capital per position
+# Stop-loss口径（唯一定义）：按"未实现PnL(USDT)"触发，PnL基于名义价值(notional)计算。
+# 触发条件：unrealized_pnl_usdt <= -max_stop_loss_per_position_usdt
+# 示例：position_size_usdt=20, leverage=10 -> notional=200U；若 max_stop_loss_per_position_usdt=10，
+# 则等价于保证金亏损50%（10/20）或名义价值回撤5%（10/200）。
+max_stop_loss_per_position_usdt = 10
 max_concurrent_positions = 3
 position_size_usdt = 20         # collateral per position (notional = 20 * leverage)
 leverage = 10

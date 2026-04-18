@@ -39,7 +39,13 @@ def check_once(client, max_loss: float) -> None:
                 client.close(pos.symbol)
                 journal.log(
                     "stop_loss_triggered",
-                    {"symbol": pos.symbol, "mark": mark, "pnl_usdt": pnl},
+                    {
+                        "symbol": pos.symbol,
+                        "mark": mark,
+                        "pnl_usdt": pnl,
+                        "max_loss_usdt": max_loss,
+                        "loss_basis": "unrealized_pnl_on_notional_usdt",
+                    },
                 )
             except Exception as e:  # noqa: BLE001
                 logger.error("close failed during stop-loss for {}: {}", pos.symbol, e)
