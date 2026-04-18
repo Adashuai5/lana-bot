@@ -27,7 +27,7 @@ AI 辅助的 Binance 合约交易机器人。Claude 每 30 分钟作为决策层
 - **标的池**：24 小时涨幅强劲 + OI 上升的 Meme/小市值币种
 - **仓位规模**：20 USDT 保证金 × 10 倍杠杆 = 200 USDT 名义价值
 - **最大并发仓位**：3 个
-- **硬止损**：每仓未实现 PnL ≤ −10 USDT 时强平（由监控守护进程强制执行；PnL 按名义价值计算）
+- **硬止损**：每仓亏损 −10 USDT（由监控守护进程强制执行）
 - **候选评分公式**：`price_change_pct + oi_change_1h_pct×1.5 + log10(volume)×2 + square_mentions×3`
 
 ---
@@ -40,8 +40,14 @@ AI 辅助的 Binance 合约交易机器人。Claude 每 30 分钟作为决策层
 4. 写入 `data/decisions/{unix_ts}.json`：
    ```json
    {
-     "open":  [{"symbol": "RAVEUSDT", "size_usdt": 20, "reason": "OI 上涨 12%，价格上涨 40%"}],
-     "close": [{"symbol": "FOOUSDT", "reason": "OI 背离，动量减弱"}],
+     "open": [
+       {
+         "symbol": "RAVEUSDT",
+         "size_usdt": 20,
+         "reason": "OI 上涨 12%，价格上涨 40%"
+       }
+     ],
+     "close": [{ "symbol": "FOOUSDT", "reason": "OI 背离，动量减弱" }],
      "skip_reason": null
    }
    ```
@@ -51,15 +57,39 @@ AI 辅助的 Binance 合约交易机器人。Claude 每 30 分钟作为决策层
 
 ## 风控规则
 
-| 关卡 | 阈值 | 执行位置 |
-|------|------|----------|
-| 每日最大亏损 | −30 USDT | circuit_breaker.py（开仓前） |
-| 每日最大开仓次数 | 12 次 | circuit_breaker.py（开仓前） |
-| 止损冷却时间 | 任意止损触发后 60 分钟 | circuit_breaker.py（开仓前） |
-| 仓位上限 | 最多 3 个并发仓位 | execute.py |
-| 硬止损 | 未实现 PnL ≤ −10 USDT（名义价值口径；当前参数下约等于保证金亏损 50%） | monitor.py 守护进程 |
+| 关卡             | 阈值                   | 执行位置                     |
+| ---------------- | ---------------------- | ---------------------------- |
+| 每日最大亏损     | −30 USDT               | circuit_breaker.py（开仓前） |
+| 每日最大开仓次数 | 12 次                  | circuit_breaker.py（开仓前） |
+| 止损冷却时间     | 任意止损触发后 60 分钟 | circuit_breaker.py（开仓前） |
+| 仓位上限         | 最多 3 个并发仓位      | execute.py                   |
+| 硬止损           | 未实现亏损 −10 USDT    | monitor.py 守护进程          |
 
 ---
+
+## 架构图
+
+```
+flowchart TD
+    A[定时任务<br>（launchd / 手动）] --> B[cycle.sh]
+
+    subgraph B [决策周期 cycle.sh]
+        direction LR
+        C[collect.py<br>采集市场数据] --> D[claude CLI<br>AI 生成决策]
+        D --> E[execute.py<br>执行交易指令]
+    end
+
+    C --> F[(data/candidates/latest.json<br>候选标的快照)]
+    D --> G[(data/decisions/*.json<br>AI 决策文件)]
+    E --> H[(data/positions.json<br>持仓状态)]
+
+    I[monitor.py<br>止损守护进程] -.->|实时监控| H
+
+    E -.->|记录事件| J[(data/journal.ndjson<br>事件日志)]
+    D -.->|读取上下文| J
+    D -.->|读取上下文| F
+    D -.->|读取上下文| H
+```
 
 ## 项目结构
 
@@ -167,20 +197,6 @@ stop_loss_cooldown_min = 60
 
 ---
 
-## 实盘启用前检查清单
-
-在把 `live_trading` 从 `false` 改为 `true` 之前，至少完成以下验证并保留测试记录：
-
-1. **签名链路**：确认每个需要签名的私有接口都按交易所规范签名（含时间戳、query/body 拼接顺序、编码方式）。
-2. **下单链路**：完成小额真实下单验证（开仓），核对请求参数、成交回报、错误码处理与日志落盘。
-3. **撤单链路**：验证撤单成功、重复撤单幂等行为、以及网络抖动下的补偿逻辑。
-4. **仓位同步**：重启进程后可从交易所拉取并对齐真实仓位，避免本地状态与交易所状态漂移。
-5. **重试策略**：仅对可重试错误进行有限重试（退避 + 抖动），不可重试错误必须快速失败并告警。
-6. **时钟偏移**：校准本机与交易所服务器时间偏差，确保签名窗口内请求不会因时间漂移被拒绝。
-
-
----
-
 ## 数据流
 
 所有状态均以纯 JSON 文件存储，无需数据库。
@@ -194,18 +210,18 @@ stop_loss_cooldown_min = 60
 
 ## 当前状态
 
-| 模块 | 状态 |
-|------|------|
-| 市场数据采集 | 正常运行 |
-| 候选标的排名 | 正常运行 |
-| 模拟交易模拟器 | 正常运行 |
-| 止损守护进程 | 正常运行 |
-| 熔断器 | 正常运行 |
-| Claude 决策周期 | 正常运行 |
-| Binance 实盘客户端 | 存根（尚未实现） |
-| Gate.io 实盘客户端 | 存根（尚未实现） |
-| Binance Square 爬虫 | 已实现（默认禁用） |
-| 实盘交易 | 已禁用（`live_trading = false`） |
+| 模块                | 状态                             |
+| ------------------- | -------------------------------- |
+| 市场数据采集        | 正常运行                         |
+| 候选标的排名        | 正常运行                         |
+| 模拟交易模拟器      | 正常运行                         |
+| 止损守护进程        | 正常运行                         |
+| 熔断器              | 正常运行                         |
+| Claude 决策周期     | 正常运行                         |
+| Binance 实盘客户端  | 存根（尚未实现）                 |
+| Gate.io 实盘客户端  | 存根（尚未实现）                 |
+| Binance Square 爬虫 | 已实现（默认禁用）               |
+| 实盘交易            | 已禁用（`live_trading = false`） |
 
 ---
 

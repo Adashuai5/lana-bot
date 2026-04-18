@@ -4,6 +4,11 @@
 export https_proxy=http://127.0.0.1:7890
 export http_proxy=http://127.0.0.1:7890
 
+nano scripts/cycle.sh
+# 开头添加：
+source ~/.zshrc
+export PATH="/usr/local/bin:$PATH"
+
 set -euo pipefail
 
 PROJECT="/Users/ada/lana-bot"
