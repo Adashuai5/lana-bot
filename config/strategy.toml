@@ -26,3 +26,9 @@ top_n_trending = 20
 max_daily_loss_usdt = 30        # halt opens once 24h realized PnL ≤ -30U (~30% of capital)
 max_daily_opens = 12            # cap opens per 24h (~cycle cadence * 3 candidates)
 stop_loss_cooldown_min = 60     # pause opens for N min after any stop-loss trigger
+
+[exit_rules]
+risk_multiple_tp = 1.5                  # +1.5R 触发盈利保护
+risk_multiple_tp_close_fraction = 0.5   # 记录计划减仓比例（当前执行层按全平处理）
+trailing_drawdown_usdt = 3              # 触发后，从浮盈高点回撤达到该值则止盈
+max_hold_seconds = 21600                # 最大持仓时长，6h

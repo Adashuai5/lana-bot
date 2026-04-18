@@ -60,7 +60,7 @@ class Simulator:
             leverage=leverage, ts_ms=ts,
         )
 
-    def close(self, symbol: str) -> FillResult:
+    def close(self, symbol: str, exit_trigger: str = "signal_decay") -> FillResult:
         pos = positions.find(symbol)
         if pos is None:
             raise ValueError(f"no position to close for {symbol}")
@@ -76,6 +76,7 @@ class Simulator:
             "close",
             {
                 "symbol": symbol,
+                "exit_trigger": exit_trigger,
                 "exit_price": price,
                 "entry_price": pos.entry_price,
                 "gross_pnl_usdt": pnl_usdt,
@@ -86,7 +87,8 @@ class Simulator:
             },
         )
         logger.info(
-            "[dry] CLOSE {} @ {} (entry {}) pnl={:.2f}U", symbol, price, pos.entry_price, net_pnl,
+            "[dry] CLOSE {} @ {} (entry {}) pnl={:.2f}U trigger={}",
+            symbol, price, pos.entry_price, net_pnl, exit_trigger,
         )
         return FillResult(
             symbol=symbol, side="CLOSE", price=price, size_usdt=pos.size_usdt,

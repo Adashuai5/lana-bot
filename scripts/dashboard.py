@@ -70,6 +70,24 @@ def api_journal():
     return jsonify([json.loads(l) for l in reversed(lines[-20:])])
 
 
+@app.get("/api/exit-stats")
+def api_exit_stats():
+    stats = {"hard_sl": 0, "trailing_tp": 0, "time_stop": 0, "signal_decay": 0, "total_closes": 0}
+    if not JOURNAL.exists():
+        return jsonify(stats)
+    for line in JOURNAL.read_text().splitlines():
+        if not line.strip():
+            continue
+        rec = json.loads(line)
+        if rec.get("event") != "close":
+            continue
+        stats["total_closes"] += 1
+        trigger = rec.get("exit_trigger", "signal_decay")
+        if trigger in stats:
+            stats[trigger] += 1
+    return jsonify(stats)
+
+
 @app.post("/api/bot/start")
 def bot_start():
     if not PLIST.exists():

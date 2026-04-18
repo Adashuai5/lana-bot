@@ -22,5 +22,5 @@ class BinanceFutures:
     def open_long(self, symbol: str, size_usdt: float, leverage: int) -> FillResult:
         raise NotImplementedError("Binance live client not yet implemented")
 
-    def close(self, symbol: str) -> FillResult:
+    def close(self, symbol: str, exit_trigger: str = "signal_decay") -> FillResult:
         raise NotImplementedError("Binance live client not yet implemented")
