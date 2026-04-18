@@ -52,15 +52,29 @@ def main(decision_path: Path) -> int:
             journal.log("skip", {"reason": "cap_reached", "symbol": item["symbol"]})
             break
 
-        breaker = check_can_open(cfg)
-        if not breaker.allowed:
-            logger.warning("circuit breaker tripped: {}", breaker.reason)
-            journal.log("skip", {"reason": breaker.reason, "symbol": item["symbol"]})
-            break
-
         symbol = item["symbol"]
         size = item["size_usdt"] if item.get("size_usdt") else cfg["position_size_usdt"]
         leverage = item["leverage"] if item.get("leverage") else cfg["leverage"]
+
+        breaker = check_can_open(
+            cfg,
+            pending_symbol=symbol,
+            pending_size_usdt=size,
+            pending_leverage=leverage,
+        )
+        if not breaker.allowed:
+            logger.warning("circuit breaker tripped: {}", breaker.reason)
+            journal.log(
+                "skip",
+                {
+                    "reason": breaker.reason,
+                    "symbol": symbol,
+                    "breaker_dimension": breaker.dimension,
+                    "breaker_details": breaker.details,
+                },
+            )
+            break
+
         try:
             client.open_long(symbol, size, leverage)
             current += 1
