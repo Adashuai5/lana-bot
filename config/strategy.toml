@@ -4,9 +4,9 @@
 live_trading = false            # MUST stay false until dry-run validation passes
 exchange = "binance"            # "binance" | "gate"
 initial_capital_usdt = 100
-max_stop_loss_per_position_usdt = 200
+max_stop_loss_per_position_usdt = 10    # 10% of capital per position
 max_concurrent_positions = 3
-position_size_usdt = 20         # notional size per position (before leverage)
+position_size_usdt = 20         # collateral per position (notional = 20 * leverage)
 leverage = 10
 cycle_minutes = 30
 
@@ -19,3 +19,10 @@ top_n_candidates = 20
 [square]
 enabled = false                 # enable after square scraper is built
 top_n_trending = 20
+
+[risk]
+# Account-level circuit breakers. Evaluated pre-open in execute.py.
+# Set any to 0 to disable that gate.
+max_daily_loss_usdt = 30        # halt opens once 24h realized PnL ≤ -30U (~30% of capital)
+max_daily_opens = 12            # cap opens per 24h (~cycle cadence * 3 candidates)
+stop_loss_cooldown_min = 60     # pause opens for N min after any stop-loss trigger

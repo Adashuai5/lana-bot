@@ -1,0 +1,106 @@
+from __future__ import annotations
+
+import json
+import subprocess
+import sys
+import time
+from dataclasses import asdict
+from pathlib import Path
+
+ROOT = Path(__file__).resolve().parents[1]
+sys.path.insert(0, str(ROOT / "src"))
+
+from flask import Flask, Response, jsonify, render_template
+from lana_bot.data.binance_futures import fetch_mark_price
+from lana_bot.risk.stop_loss import unrealized_pnl_usdt
+from lana_bot.state.positions import list_positions
+
+app = Flask(__name__, template_folder=str(ROOT / "templates"))
+
+JOURNAL     = ROOT / "data" / "journal.ndjson"
+CANDIDATES  = ROOT / "data" / "candidates" / "latest.json"
+LOG_FILE    = ROOT / "logs" / "cycle.log"
+CYCLE_LABEL = "com.lana-bot.cycle"
+PLIST       = Path.home() / "Library/LaunchAgents/com.lana-bot.cycle.plist"
+
+
+def _bot_running() -> bool:
+    return subprocess.run(["launchctl", "list", CYCLE_LABEL],
+                          capture_output=True).returncode == 0
+
+
+@app.get("/")
+def index():
+    return render_template("dashboard.html")
+
+
+@app.get("/api/status")
+def api_status():
+    return jsonify({"running": _bot_running(), "ts": int(time.time())})
+
+
+@app.get("/api/positions")
+def api_positions():
+    result = []
+    for pos in list_positions():
+        d = asdict(pos)
+        try:
+            mark = fetch_mark_price(pos.symbol)
+            d["mark_price"] = mark
+            d["unrealized_pnl_usdt"] = round(unrealized_pnl_usdt(pos, mark), 2)
+            d["pnl_pct"] = round((mark - pos.entry_price) / pos.entry_price * 100 * pos.leverage, 2)
+        except Exception:
+            d.update(mark_price=None, unrealized_pnl_usdt=None, pnl_pct=None)
+        result.append(d)
+    return jsonify(result)
+
+
+@app.get("/api/candidates")
+def api_candidates():
+    if not CANDIDATES.exists():
+        return jsonify({"candidates": [], "generated_at_ms": None})
+    return jsonify(json.loads(CANDIDATES.read_text()))
+
+
+@app.get("/api/journal")
+def api_journal():
+    if not JOURNAL.exists():
+        return jsonify([])
+    lines = JOURNAL.read_text().strip().splitlines()
+    return jsonify([json.loads(l) for l in reversed(lines[-20:])])
+
+
+@app.post("/api/bot/start")
+def bot_start():
+    if not PLIST.exists():
+        return jsonify({"ok": False, "error": f"{PLIST} not found"}), 400
+    r = subprocess.run(["launchctl", "load", str(PLIST)], capture_output=True, text=True)
+    return jsonify({"ok": r.returncode == 0, "stderr": r.stderr})
+
+
+@app.post("/api/bot/stop")
+def bot_stop():
+    if not PLIST.exists():
+        return jsonify({"ok": False, "error": f"{PLIST} not found"}), 400
+    r = subprocess.run(["launchctl", "unload", str(PLIST)], capture_output=True, text=True)
+    return jsonify({"ok": r.returncode == 0, "stderr": r.stderr})
+
+
+@app.get("/stream/logs")
+def stream_logs():
+    def generate():
+        proc = subprocess.Popen(
+            ["tail", "-n", "50", "-f", str(LOG_FILE)],
+            stdout=subprocess.PIPE, stderr=subprocess.DEVNULL, text=True,
+        )
+        try:
+            for line in proc.stdout:
+                yield f"data: {line.rstrip()}\n\n"
+        finally:
+            proc.terminate()
+    return Response(generate(), mimetype="text/event-stream",
+                    headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"})
+
+
+if __name__ == "__main__":
+    app.run(host="127.0.0.1", port=5000, debug=False, threaded=True)

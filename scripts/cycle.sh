@@ -1,6 +1,8 @@
 #!/bin/zsh
 # One full decision cycle: collect → ask Claude to decide → execute.
 # Called by launchd every 30 min.
+export https_proxy=http://127.0.0.1:7890
+export http_proxy=http://127.0.0.1:7890
 
 set -euo pipefail
 

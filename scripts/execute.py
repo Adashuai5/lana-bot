@@ -14,6 +14,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))
 
 from lana_bot.config import DATA_DIR, LOGS_DIR, strategy  # noqa: E402
 from lana_bot.execution import get_client  # noqa: E402
+from lana_bot.risk.circuit_breaker import check_can_open  # noqa: E402
 from lana_bot.state import journal, positions  # noqa: E402
 
 
@@ -44,9 +45,16 @@ def main(decision_path: Path) -> int:
             logger.warning("position cap reached ({}), skipping remaining opens", cap)
             journal.log("skip", {"reason": "cap_reached", "symbol": item["symbol"]})
             break
+
+        breaker = check_can_open(cfg)
+        if not breaker.allowed:
+            logger.warning("circuit breaker tripped: {}", breaker.reason)
+            journal.log("skip", {"reason": breaker.reason, "symbol": item["symbol"]})
+            break
+
         symbol = item["symbol"]
-        size = item.get("size_usdt") or cfg["position_size_usdt"]
-        leverage = item.get("leverage") or cfg["leverage"]
+        size = item["size_usdt"] if item.get("size_usdt") else cfg["position_size_usdt"]
+        leverage = item["leverage"] if item.get("leverage") else cfg["leverage"]
         try:
             client.open_long(symbol, size, leverage)
             current += 1
