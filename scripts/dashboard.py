@@ -10,7 +10,7 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "src"))
 
-from flask import Flask, Response, jsonify, render_template
+from flask import Flask, Response, jsonify, render_template, request
 from lana_bot.data.binance_futures import fetch_mark_price
 from lana_bot.risk.stop_loss import unrealized_pnl_usdt
 from lana_bot.state.positions import list_positions
@@ -66,8 +66,9 @@ def api_candidates():
 def api_journal():
     if not JOURNAL.exists():
         return jsonify([])
+    n = min(int(request.args.get("n", 20)), 500)
     lines = JOURNAL.read_text().strip().splitlines()
-    return jsonify([json.loads(l) for l in reversed(lines[-20:])])
+    return jsonify([json.loads(l) for l in reversed(lines[-n:])])
 
 
 @app.get("/api/exit-stats")
@@ -86,6 +87,40 @@ def api_exit_stats():
         if trigger in stats:
             stats[trigger] += 1
     return jsonify(stats)
+
+
+@app.post("/api/bot/collect")
+def bot_collect():
+    import threading
+    def run():
+        subprocess.run(["uv", "run", "python", "scripts/collect.py"],
+                       capture_output=True, cwd=str(ROOT))
+    threading.Thread(target=run, daemon=True).start()
+    return jsonify({"ok": True})
+
+
+@app.post("/api/bot/cycle")
+def bot_cycle():
+    import threading
+    def run():
+        subprocess.run(["bash", "scripts/cycle.sh"],
+                       capture_output=True, cwd=str(ROOT))
+    threading.Thread(target=run, daemon=True).start()
+    return jsonify({"ok": True})
+
+
+@app.post("/api/positions/close")
+def api_close_position():
+    from lana_bot.execution import get_client
+    symbol = (request.json or {}).get("symbol")
+    if not symbol:
+        return jsonify({"ok": False, "error": "symbol required"}), 400
+    try:
+        client = get_client()
+        client.close(symbol)
+        return jsonify({"ok": True})
+    except Exception as e:
+        return jsonify({"ok": False, "error": str(e)}), 500
 
 
 @app.post("/api/bot/start")
@@ -121,4 +156,4 @@ def stream_logs():
 
 
 if __name__ == "__main__":
-    app.run(host="127.0.0.1", port=5000, debug=False, threaded=True)
+    app.run(host="127.0.0.1", port=5001, debug=False, threaded=True)

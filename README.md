@@ -14,7 +14,7 @@ AI 辅助的 Binance 合约交易机器人。Claude 每 30 分钟作为决策层
     └─ execute.py          → 通过交易所客户端执行开/平仓
 
 持续运行的守护进程（launchd KeepAlive）
-  monitor.py               → 每 10 秒轮询盈亏，触发止损
+  monitor.py               → 每 10 秒轮询盈亏，触发止损 / 止盈 / 时间止损
 ```
 
 **Claude 只负责判断** — 不直接调用交易所或抓取数据，所有 I/O 由 Python 处理。
@@ -28,7 +28,7 @@ AI 辅助的 Binance 合约交易机器人。Claude 每 30 分钟作为决策层
 - **仓位规模**：20 USDT 保证金 × 10 倍杠杆 = 200 USDT 名义价值
 - **最大并发仓位**：3 个
 - **硬止损**：每仓亏损 −10 USDT（由监控守护进程强制执行）
-- **候选评分公式**：`price_change_pct + oi_change_1h_pct×1.5 + log10(volume)×2 + square_mentions×3`
+- **候选评分**：多维度加权评分（趋势斜率、OI 连续性、流动性分位），含 winsorization + z-score 异常值过滤
 
 ---
 
@@ -57,13 +57,19 @@ AI 辅助的 Binance 合约交易机器人。Claude 每 30 分钟作为决策层
 
 ## 风控规则
 
-| 关卡             | 阈值                   | 执行位置                     |
-| ---------------- | ---------------------- | ---------------------------- |
-| 每日最大亏损     | −30 USDT               | circuit_breaker.py（开仓前） |
-| 每日最大开仓次数 | 12 次                  | circuit_breaker.py（开仓前） |
-| 止损冷却时间     | 任意止损触发后 60 分钟 | circuit_breaker.py（开仓前） |
-| 仓位上限         | 最多 3 个并发仓位      | execute.py                   |
-| 硬止损           | 未实现亏损 −10 USDT    | monitor.py 守护进程          |
+| 关卡                 | 阈值                        | 执行位置                     |
+| -------------------- | --------------------------- | ---------------------------- |
+| 每日最大已实现亏损   | −30 USDT                    | circuit_breaker.py（开仓前） |
+| 组合未实现回撤上限   | −20 USDT                    | circuit_breaker.py（开仓前） |
+| 板块集中度           | 单主题仓位 ≤ 60% 初始资金   | circuit_breaker.py（开仓前） |
+| 每日最大开仓次数     | 12 次                       | circuit_breaker.py（开仓前） |
+| 止损冷却时间         | 任意止损触发后 60 分钟      | circuit_breaker.py（开仓前） |
+| 仓位上限             | 最多 3 个并发仓位           | execute.py                   |
+| 硬止损               | 未实现亏损 −10 USDT         | monitor.py 守护进程          |
+| 风险倍数止盈         | 盈利达 1.5× 风险，平仓 50%  | monitor.py 守护进程          |
+| 追踪回撤保护         | 从峰值回撤 −3 USDT 平仓     | monitor.py 守护进程          |
+| 最大持仓时间         | 6 小时（21600 秒）          | monitor.py 守护进程          |
+| 市场机制门控         | BTC/ETH 趋势 + 宽度 + 波动率分位 | execute.py（默认禁用）  |
 
 ---
 
@@ -125,7 +131,10 @@ src/lana_bot/
     gate.py            # Gate.io 实盘客户端（存根，备用交易所）
   risk/
     stop_loss.py       # 未实现盈亏计算，should_stop_out()
-    circuit_breaker.py # 账户级开仓前风控关卡
+    circuit_breaker.py # 账户级开仓前风控关卡（多维熔断）
+    exit_rules.py      # 结构化出场逻辑（风险倍数 TP、追踪回撤、时间止损）
+  data/
+    market_regime.py   # 市场机制指标（BTC/ETH 趋势、宽度、波动率分位）+ 执行门控
 
 data/
   candidates/          # 市场快照（latest.json 软链接 + 带时间戳文件）
@@ -190,9 +199,23 @@ min_oi_change_1h_pct = 5
 top_n_candidates = 20
 
 [risk]
-max_daily_loss_usdt = 30
+max_daily_loss_usdt = 30        # 每日已实现亏损上限
+max_unrealized_drawdown_usdt = 20 # 组合未实现回撤上限
+max_sector_exposure_pct = 60    # 单主题仓位占初始资金比例上限
 max_daily_opens = 12
 stop_loss_cooldown_min = 60
+
+[exit_rules]
+risk_multiple_tp = 1.5          # 盈利达风险的 1.5 倍触发止盈
+risk_multiple_tp_close_fraction = 0.5  # 止盈时平仓比例
+trailing_drawdown_usdt = 3      # 从峰值回撤 3 USDT 触发追踪止损
+max_hold_seconds = 21600        # 最大持仓时间 6 小时
+
+[regime]
+enabled = false                 # 是否启用市场机制分析
+execute_gate_enabled = false    # 是否允许机制门控阻断/缩减开仓
+reduce_size_multiplier = 0.5    # 缩减档位下的仓位比例
+# BTC/ETH 4h 趋势阈值、市场宽度范围、波动率分位上限等详见 strategy.toml
 ```
 
 ---
