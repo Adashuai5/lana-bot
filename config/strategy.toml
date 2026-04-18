@@ -33,21 +33,24 @@ max_sector_exposure_pct = 60     # cap single-theme (e.g. meme cluster) exposure
 max_daily_opens = 12            # cap opens per 24h (~cycle cadence * 3 candidates)
 stop_loss_cooldown_min = 60     # pause opens for N min after any stop-loss trigger
 
-[regime]
-enabled = false                 # 灰度开关：先仅观测，不影响交易
-execute_gate_enabled = false    # 开仓前 gate 开关（allow/reduce/block）
-reduce_size_multiplier = 0.5    # regime=reduce 时按此系数缩仓
+[exit_rules]
+risk_multiple_tp = 1.5
+risk_multiple_tp_close_fraction = 0.5
+trailing_drawdown_usdt = 3
+max_hold_seconds = 21600
 
-# 4h 趋势判定：以 lookback 区间首尾涨跌幅判断 up/down/flat
+[regime]
+enabled = false
+execute_gate_enabled = false
+reduce_size_multiplier = 0.5
+
 trend_lookback_bars_4h = 30
 trend_drift_up_pct_4h = 0.02
 trend_drift_down_pct_4h = 0.02
 
-# 市场 breadth 阈值（上涨占比）
 breadth_allow_min = 0.52
 breadth_reduce_min = 0.45
 
-# 波动率阈值（BTC 1h realized vol 分位）
 vol_window_hours = 24
 vol_history_hours = 336
 vol_allow_quantile_max = 0.75

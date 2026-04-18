@@ -63,7 +63,7 @@ def main(decision_path: Path) -> int:
     for item in decision.get("close", []):
         symbol = item["symbol"]
         try:
-            client.close(symbol)
+            client.close(symbol, exit_trigger=item.get("exit_trigger", "signal_decay"))
         except Exception as e:  # noqa: BLE001
             logger.error("close failed for {}: {}", symbol, e)
             journal.log("error", {"op": "close", "symbol": symbol, "error": str(e)})

@@ -35,6 +35,7 @@
   .tag-decision { background: #1a2a3a; color: #64b5f6; }
   .tag-skip { background: #2a2a1a; color: #ffd54f; }
   .tag-error { background: #3a1a1a; color: #ef5350; }
+  .tag-exit_triggered { background: #2f1a3a; color: #ce93d8; }
   .empty { padding: 16px; color: #444; text-align: center; }
   #log-box { padding: 8px 12px; }
   #log-output { height: 280px; overflow-y: auto; white-space: pre; font-size: 11px;
@@ -66,6 +67,11 @@
   <section>
     <h2>决策日志（最近20条）</h2>
     <div id="journal-container"><p class="empty">加载中...</p></div>
+  </section>
+
+  <section>
+    <h2>出场类型统计</h2>
+    <div id="exit-stats-container"><p class="empty">加载中...</p></div>
   </section>
 
   <section>
@@ -161,7 +167,9 @@ async function loadJournal() {
         detail = `入场 ${e.price} × ${e.leverage}x = ${e.notional_usdt}U`;
       } else if (e.event === 'close') {
         const pnl = e.net_pnl_usdt;
-        detail = `<span class="${pnl >= 0 ? 'pos' : 'neg'}">${pnl?.toFixed(2)}U</span> 出场 ${e.exit_price}`;
+        detail = `<span class="${pnl >= 0 ? 'pos' : 'neg'}">${pnl?.toFixed(2)}U</span> 出场 ${e.exit_price} [${e.exit_trigger || 'signal_decay'}]`;
+      } else if (e.event === 'exit_triggered') {
+        detail = `${e.exit_type || '-'} | ${(e.reason || '').slice(0, 72)}`;
       } else if (e.event === 'skip') {
         detail = (e.reason||'').slice(0, 80);
       } else if (e.event === 'error') {
@@ -177,8 +185,25 @@ async function loadJournal() {
   </table>`;
 }
 
+async function loadExitStats() {
+  const data = await fetch('/api/exit-stats').then(r => r.json());
+  const el = document.getElementById('exit-stats-container');
+  if (!data.total_closes) {
+    el.innerHTML = '<p class="empty">暂无平仓记录</p>';
+    return;
+  }
+  const pct = (v) => (100 * v / data.total_closes).toFixed(1) + '%';
+  el.innerHTML = `<table>
+    <tr><th>类型</th><th>次数</th><th>占比</th></tr>
+    <tr><td>hard_sl</td><td>${data.hard_sl}</td><td class="neg">${pct(data.hard_sl)}</td></tr>
+    <tr><td>trailing_tp</td><td>${data.trailing_tp}</td><td class="pos">${pct(data.trailing_tp)}</td></tr>
+    <tr><td>time_stop</td><td>${data.time_stop}</td><td>${pct(data.time_stop)}</td></tr>
+    <tr><td>signal_decay</td><td>${data.signal_decay}</td><td>${pct(data.signal_decay)}</td></tr>
+  </table>`;
+}
+
 async function loadAll() {
-  await Promise.all([loadStatus(), loadPositions(), loadCandidates(), loadJournal()]);
+  await Promise.all([loadStatus(), loadPositions(), loadCandidates(), loadJournal(), loadExitStats()]);
   document.getElementById('refresh-info').textContent = '更新于 ' + new Date().toLocaleTimeString('zh-CN', {hour12:false});
 }
 
