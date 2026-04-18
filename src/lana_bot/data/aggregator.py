@@ -18,6 +18,7 @@ from lana_bot.data.binance_futures import (
     fetch_oi_history,
     oi_change_pct,
 )
+from lana_bot.data.market_regime import safe_compute_market_regime
 
 
 @dataclass
@@ -110,6 +111,7 @@ def build_candidates(square_mentions: dict[str, int] | None = None) -> dict:
 
     tickers = fetch_all_24h_tickers()
     logger.info("fetched {} USDT-perp tickers", len(tickers))
+    regime = safe_compute_market_regime(tickers_24h=tickers, cfg=cfg)
 
     filter_reason_stats: Counter[str] = Counter()
 
@@ -239,6 +241,7 @@ def build_candidates(square_mentions: dict[str, int] | None = None) -> dict:
 
     return {
         "generated_at_ms": int(time.time() * 1000),
+        "regime": regime,
         "count": len(top),
         "candidates": [asdict(c) for c in top],
         "filter_reason_stats": dict(filter_reason_stats),
