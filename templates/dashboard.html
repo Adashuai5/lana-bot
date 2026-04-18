@@ -3,610 +3,713 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>lana-bot</title>
+<title>Lana 交易机器人</title>
 <style>
 * { box-sizing: border-box; margin: 0; padding: 0; }
-body { font-family: monospace; font-size: 13px; background: #0a0a0a; color: #d0d0d0; }
+body { font-family: -apple-system, BlinkMacSystemFont, "PingFang SC", "Helvetica Neue", sans-serif;
+       font-size: 14px; background: #f0f2f5; color: #1a1a2e; min-height: 100vh; }
 
 /* ── Header ── */
 header {
-  display: flex; align-items: center; gap: 12px;
-  padding: 10px 20px; background: #111; border-bottom: 1px solid #222;
+  background: #1a1a2e; color: #fff;
+  padding: 14px 24px;
+  display: flex; align-items: center; gap: 16px;
   position: sticky; top: 0; z-index: 100;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.3);
 }
-header h1 { font-size: 15px; color: #fff; letter-spacing: 1px; }
-.badge { padding: 3px 8px; border-radius: 3px; font-size: 11px; font-weight: bold; }
-.badge-run  { background: #0d2e0d; color: #4caf50; border: 1px solid #2e5e2e; }
-.badge-stop { background: #2e0d0d; color: #f44336; border: 1px solid #5e2e2e; }
-.btn { padding: 4px 12px; border: 1px solid #333; background: #1a1a1a; color: #bbb;
-       cursor: pointer; border-radius: 3px; font-size: 12px; font-family: monospace; }
-.btn:hover { background: #252525; color: #fff; }
-.btn-danger { border-color: #5e2e2e; color: #f44336; }
-.btn-danger:hover { background: #2e0d0d; }
-.btn-primary { border-color: #2e5e2e; color: #4caf50; }
-.btn-primary:hover { background: #0d2e0d; }
-.btn-sm { padding: 2px 8px; font-size: 11px; }
-#refresh-info { margin-left: auto; color: #444; font-size: 11px; }
-#countdown { color: #555; font-size: 11px; margin-left: 8px; }
+header h1 { font-size: 18px; font-weight: 600; letter-spacing: 0.5px; }
+header h1 span { color: #7c83fd; }
+
+.status-pill {
+  display: flex; align-items: center; gap: 6px;
+  padding: 5px 12px; border-radius: 20px; font-size: 13px; font-weight: 500;
+}
+.status-on  { background: rgba(52,211,153,0.15); color: #34d399; border: 1px solid rgba(52,211,153,0.3); }
+.status-off { background: rgba(239,68,68,0.15);  color: #ef4444;  border: 1px solid rgba(239,68,68,0.3); }
+.dot { width: 8px; height: 8px; border-radius: 50%; }
+.dot-on  { background: #34d399; animation: pulse 2s infinite; }
+.dot-off { background: #ef4444; }
+@keyframes pulse { 0%,100%{opacity:1} 50%{opacity:.4} }
+
+.header-actions { margin-left: auto; display: flex; gap: 8px; align-items: center; }
+.btn {
+  padding: 6px 14px; border-radius: 8px; border: none; cursor: pointer;
+  font-size: 13px; font-weight: 500; transition: all .2s;
+}
+.btn-start  { background: #34d399; color: #fff; }
+.btn-stop   { background: #ef4444; color: #fff; }
+.btn-action { background: rgba(255,255,255,0.1); color: #fff; border: 1px solid rgba(255,255,255,0.2); }
+.btn:hover  { opacity: 0.85; transform: translateY(-1px); }
+
+#next-run { color: rgba(255,255,255,0.45); font-size: 12px; }
 
 /* ── Layout ── */
-main { padding: 16px 20px; display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
-.col-full  { grid-column: 1 / -1; }
-.col-left  { grid-column: 1; }
-.col-right { grid-column: 2; }
+main { padding: 20px 24px; max-width: 1200px; margin: 0 auto; display: grid; gap: 16px; }
 
-/* ── Card ── */
-.card { background: #111; border: 1px solid #1e1e1e; border-radius: 6px; overflow: hidden; }
-.card-header {
-  display: flex; align-items: center; gap: 8px;
-  padding: 8px 14px; border-bottom: 1px solid #1e1e1e;
+/* ── Overview cards ── */
+.overview { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; }
+.ov-card {
+  background: #fff; border-radius: 12px; padding: 18px 20px;
+  box-shadow: 0 1px 4px rgba(0,0,0,0.06);
 }
-.card-header h2 { font-size: 11px; color: #666; text-transform: uppercase; letter-spacing: 1px; flex: 1; }
-.card-header .meta { font-size: 11px; color: #444; }
-.stale { color: #b26200 !important; }
+.ov-label { font-size: 12px; color: #888; margin-bottom: 8px; font-weight: 500; letter-spacing: 0.3px; }
+.ov-value { font-size: 28px; font-weight: 700; line-height: 1; }
+.ov-sub   { font-size: 12px; color: #aaa; margin-top: 6px; }
+.green { color: #10b981; }
+.red   { color: #ef4444; }
+.gray  { color: #9ca3af; }
+.blue  { color: #6366f1; }
 
-/* ── Summary strip ── */
-#summary-strip {
-  display: flex; gap: 1px; background: #1a1a1a;
-  border-bottom: 1px solid #222;
+/* ── Section ── */
+.section { background: #fff; border-radius: 12px; box-shadow: 0 1px 4px rgba(0,0,0,0.06); overflow: hidden; }
+.section-header {
+  padding: 16px 20px; border-bottom: 1px solid #f0f0f0;
+  display: flex; align-items: center; gap: 10px;
 }
-.stat-box { flex: 1; padding: 10px 16px; background: #111; }
-.stat-box .label { font-size: 10px; color: #555; text-transform: uppercase; letter-spacing: 1px; }
-.stat-box .value { font-size: 20px; font-weight: bold; margin-top: 2px; }
-.stat-box .sub   { font-size: 11px; color: #555; margin-top: 1px; }
+.section-title { font-size: 15px; font-weight: 600; color: #1a1a2e; flex: 1; }
+.section-meta  { font-size: 12px; color: #aaa; }
+.stale-text { color: #f59e0b !important; }
+.section-body { padding: 16px 20px; }
 
-/* ── Table ── */
-table { width: 100%; border-collapse: collapse; }
-th { padding: 6px 12px; text-align: left; color: #555; font-weight: normal;
-     border-bottom: 1px solid #1a1a1a; white-space: nowrap; font-size: 11px; }
-td { padding: 6px 12px; border-bottom: 1px solid #161616; white-space: nowrap; }
-tr:last-child td { border-bottom: none; }
-tr:hover td { background: #161616; }
-.sortable { cursor: pointer; user-select: none; }
-.sortable:hover { color: #999; }
-.sort-asc::after  { content: ' ▲'; font-size: 9px; }
-.sort-desc::after { content: ' ▼'; font-size: 9px; }
+/* ── Position cards ── */
+.pos-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 12px; padding: 16px 20px; }
+.pos-card {
+  border-radius: 10px; padding: 16px;
+  border: 1px solid #e8eaed;
+  background: #fff;
+  position: relative; overflow: hidden;
+}
+.pos-card::before {
+  content: ''; position: absolute; left: 0; top: 0; bottom: 0; width: 4px;
+}
+.pos-long::before  { background: #10b981; }
+.pos-short::before { background: #ef4444; }
+.pos-coin { font-size: 16px; font-weight: 700; margin-bottom: 4px; }
+.pos-dir  { display: inline-block; padding: 2px 8px; border-radius: 4px; font-size: 11px; font-weight: 600; margin-bottom: 12px; }
+.dir-long  { background: #d1fae5; color: #065f46; }
+.dir-short { background: #fee2e2; color: #991b1b; }
+.pos-pnl { font-size: 26px; font-weight: 700; margin-bottom: 4px; }
+.pos-pnl-desc { font-size: 12px; color: #888; margin-bottom: 12px; }
+.pos-row  { display: flex; justify-content: space-between; margin-bottom: 6px; font-size: 13px; }
+.pos-row-label { color: #888; }
+.pos-row-val   { font-weight: 500; }
+.sl-bar-outer { height: 6px; background: #f0f0f0; border-radius: 3px; margin: 10px 0; }
+.sl-bar-inner { height: 6px; border-radius: 3px; transition: width .3s; }
+.sl-bar-ok   { background: #10b981; }
+.sl-bar-warn { background: #f59e0b; }
+.sl-bar-danger { background: #ef4444; }
+.sl-label { font-size: 11px; color: #aaa; margin-top: 2px; }
+.close-btn {
+  margin-top: 12px; width: 100%; padding: 8px; border: 1px solid #e8eaed;
+  border-radius: 8px; background: #fff; cursor: pointer; font-size: 13px; color: #888;
+  transition: all .2s;
+}
+.close-btn:hover { border-color: #ef4444; color: #ef4444; background: #fff5f5; }
 
-/* ── PnL bar ── */
-.pnl-cell { min-width: 120px; }
-.pnl-bar-wrap { display: flex; align-items: center; gap: 6px; }
-.pnl-bar-bg { flex: 1; height: 4px; background: #1e1e1e; border-radius: 2px; min-width: 50px; }
-.pnl-bar-fill { height: 4px; border-radius: 2px; transition: width .3s; }
-.pnl-bar-pos { background: #4caf50; }
-.pnl-bar-neg { background: #f44336; }
+/* ── Watchlist ── */
+.watch-list { padding: 8px 0; }
+.watch-item {
+  display: flex; align-items: center; padding: 10px 20px; gap: 12px;
+  border-bottom: 1px solid #f9f9f9; transition: background .1s;
+}
+.watch-item:last-child { border-bottom: none; }
+.watch-item:hover { background: #f9fafb; }
+.watch-rank { font-size: 13px; color: #ccc; font-weight: 600; width: 24px; text-align: center; flex-shrink: 0; }
+.watch-coin { font-weight: 600; font-size: 14px; flex: 1; }
+.watch-sub  { font-size: 12px; color: #aaa; font-weight: 400; }
+.watch-dir-badge { padding: 2px 8px; border-radius: 4px; font-size: 11px; font-weight: 600; flex-shrink: 0; }
+.watch-long  { background: #d1fae5; color: #065f46; }
+.watch-short { background: #fee2e2; color: #991b1b; }
+.watch-gain  { font-size: 15px; font-weight: 700; width: 70px; text-align: right; flex-shrink: 0; }
+.watch-heat  { display: flex; align-items: center; gap: 4px; width: 90px; flex-shrink: 0; }
+.heat-dots   { display: flex; gap: 2px; }
+.heat-dot    { width: 6px; height: 6px; border-radius: 50%; background: #e5e7eb; }
+.heat-dot.on { background: #6366f1; }
+.heat-text   { font-size: 11px; color: #aaa; }
+.watch-held  { font-size: 11px; color: #10b981; font-weight: 600; }
 
-/* ── Colors ── */
-.pos  { color: #4caf50; }
-.neg  { color: #f44336; }
-.dim  { color: #555; }
-.warn { color: #ffd54f; }
+/* ── Timeline ── */
+.timeline { padding: 8px 20px; }
+.tl-item  { display: flex; gap: 12px; padding: 10px 0; border-bottom: 1px solid #f5f5f5; }
+.tl-item:last-child { border-bottom: none; }
+.tl-icon  { width: 32px; height: 32px; border-radius: 50%; display: flex; align-items: center;
+             justify-content: center; font-size: 14px; flex-shrink: 0; margin-top: 2px; }
+.ic-buy    { background: #d1fae5; }
+.ic-sell   { background: #fee2e2; }
+.ic-think  { background: #e0e7ff; }
+.ic-skip   { background: #f3f4f6; }
+.ic-error  { background: #fee2e2; }
+.ic-sl     { background: #fef3c7; }
+.tl-body  { flex: 1; }
+.tl-title { font-weight: 600; font-size: 13px; color: #1a1a2e; }
+.tl-desc  { font-size: 12px; color: #888; margin-top: 2px; line-height: 1.5; }
+.tl-time  { font-size: 11px; color: #ccc; margin-top: 3px; }
+.tl-pnl   { font-weight: 700; }
 
-/* ── Tags ── */
-.tag { padding: 1px 6px; border-radius: 2px; font-size: 11px; }
-.tag-open          { background: #0d2e0d; color: #4caf50; }
-.tag-close         { background: #2e0d0d; color: #f44336; }
-.tag-decision      { background: #0d1e2e; color: #64b5f6; }
-.tag-skip          { background: #2a2a0d; color: #ffd54f; }
-.tag-error         { background: #2e0d0d; color: #ef5350; }
-.tag-exit_triggered{ background: #1e0d2e; color: #ce93d8; }
-.tag-stop_loss_triggered { background: #3e0d0d; color: #ff5252; }
+/* ── Stats ── */
+.stats-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 16px; padding: 16px 20px; }
+.stat-item { text-align: center; }
+.stat-num  { font-size: 24px; font-weight: 700; }
+.stat-lbl  { font-size: 12px; color: #aaa; margin-top: 4px; }
 
-/* ── Filter bar ── */
-.filter-bar { display: flex; gap: 6px; padding: 8px 12px; border-bottom: 1px solid #1a1a1a; flex-wrap: wrap; }
-.filter-btn { padding: 2px 8px; border: 1px solid #2a2a2a; background: #151515;
-              color: #666; border-radius: 10px; cursor: pointer; font-size: 11px; font-family: monospace; }
-.filter-btn.active { background: #1e2e1e; border-color: #3e5e3e; color: #8bc34a; }
-.filter-btn:hover { border-color: #444; color: #aaa; }
+/* ── Empty ── */
+.empty-state { padding: 40px 20px; text-align: center; color: #ccc; }
+.empty-state .emoji { font-size: 32px; margin-bottom: 8px; }
+.empty-state p { font-size: 14px; }
 
-/* ── Progress bar (SL distance) ── */
-.sl-bar-wrap { display: flex; align-items: center; gap: 6px; min-width: 100px; }
-.sl-bar-bg   { flex: 1; height: 4px; background: #1e1e1e; border-radius: 2px; }
-.sl-bar-fill { height: 4px; border-radius: 2px; background: #4caf50; transition: width .3s; }
+/* ── PnL chart ── */
+#pnl-chart-wrap { padding: 16px 20px 8px; }
 
-/* ── Pie chart ── */
-#exit-chart-wrap { padding: 16px; display: flex; gap: 24px; align-items: center; }
-#exit-canvas     { flex-shrink: 0; }
-#exit-legend     { display: flex; flex-direction: column; gap: 8px; }
-.legend-item     { display: flex; align-items: center; gap: 8px; font-size: 12px; }
-.legend-dot      { width: 10px; height: 10px; border-radius: 50%; flex-shrink: 0; }
+/* ── Footer ── */
+.footer-bar {
+  display: flex; gap: 16px; padding: 12px 20px;
+  border-top: 1px solid #f0f0f0; flex-wrap: wrap;
+}
+.footer-stat { font-size: 12px; color: #aaa; }
+.footer-stat b { color: #666; }
 
-/* ── PnL sparkline ── */
-#pnl-chart-wrap { padding: 12px 16px; }
+/* ── Tabs ── */
+.tab-bar { display: flex; gap: 0; border-bottom: 1px solid #f0f0f0; padding: 0 20px; }
+.tab-btn { padding: 10px 16px; font-size: 13px; font-weight: 500; color: #999; cursor: pointer;
+           border-bottom: 2px solid transparent; margin-bottom: -1px; transition: all .15s; background: none; border-top: none; border-left: none; border-right: none; }
+.tab-btn.active { color: #6366f1; border-bottom-color: #6366f1; }
+.tab-btn:hover  { color: #6366f1; }
+.tab-panel { display: none; }
+.tab-panel.active { display: block; }
 
-/* ── Log ── */
-#log-output { height: 220px; overflow-y: auto; white-space: pre; font-size: 11px;
-              color: #5a8a5a; line-height: 1.5; padding: 10px 14px; }
-
-/* ── Empty / loading ── */
-.empty { padding: 20px; color: #333; text-align: center; }
+@media (max-width: 768px) {
+  .overview { grid-template-columns: repeat(2, 1fr); }
+  main { padding: 12px 16px; }
+}
 </style>
 </head>
 <body>
 
 <header>
-  <h1>lana-bot</h1>
-  <span id="status-badge" class="badge badge-stop">…</span>
-  <button class="btn btn-primary" onclick="botAction('start')">启动</button>
-  <button class="btn btn-danger"  onclick="botAction('stop')">停止</button>
-  <button class="btn" onclick="triggerCollect()">采集</button>
-  <button class="btn" onclick="triggerCycle()">决策</button>
-  <span id="refresh-info">加载中…</span>
-  <span id="countdown"></span>
+  <h1>Lana <span>交易机器人</span></h1>
+  <div id="status-pill" class="status-pill status-off">
+    <div class="dot dot-off" id="status-dot"></div>
+    <span id="status-text">检查中…</span>
+  </div>
+  <div class="header-actions">
+    <span id="next-run"></span>
+    <button class="btn btn-action" onclick="triggerCollect()">立即扫描</button>
+    <button class="btn btn-action" onclick="triggerCycle()">立即决策</button>
+    <button class="btn btn-start" onclick="botAction('start')">启动</button>
+    <button class="btn btn-stop"  onclick="botAction('stop')">停止</button>
+  </div>
 </header>
 
-<!-- summary strip -->
-<div id="summary-strip">
-  <div class="stat-box"><div class="label">持仓</div><div class="value" id="s-count">-</div><div class="sub">/ 3 上限</div></div>
-  <div class="stat-box"><div class="label">未实现PnL</div><div class="value" id="s-upnl">-</div><div class="sub" id="s-upnl-sub"></div></div>
-  <div class="stat-box"><div class="label">今日已实现</div><div class="value" id="s-rpnl">-</div><div class="sub" id="s-rpnl-sub"></div></div>
-  <div class="stat-box"><div class="label">候选标的</div><div class="value" id="s-cands">-</div><div class="sub" id="s-cands-age"></div></div>
-</div>
-
 <main>
-  <!-- 持仓 (full width) -->
-  <section class="card col-full">
-    <div class="card-header">
-      <h2>持仓</h2>
+
+  <!-- Overview -->
+  <div class="overview">
+    <div class="ov-card">
+      <div class="ov-label">当前持仓</div>
+      <div class="ov-value blue" id="ov-count">-</div>
+      <div class="ov-sub" id="ov-count-sub">最多同时持有3个</div>
     </div>
-    <div id="positions-container"><p class="empty">加载中…</p></div>
-  </section>
-
-  <!-- 候选信号 (full width) -->
-  <section class="card col-full">
-    <div class="card-header">
-      <h2>候选信号</h2>
-      <span class="meta" id="candidates-ts"></span>
+    <div class="ov-card">
+      <div class="ov-label">持仓浮动盈亏</div>
+      <div class="ov-value" id="ov-upnl">-</div>
+      <div class="ov-sub" id="ov-upnl-sub">尚未锁定</div>
     </div>
-    <div id="candidates-container"><p class="empty">加载中…</p></div>
-  </section>
-
-  <!-- 日志 (left) -->
-  <section class="card col-left">
-    <div class="card-header"><h2>决策日志（最近20条）</h2></div>
-    <div class="filter-bar" id="journal-filters"></div>
-    <div id="journal-container"><p class="empty">加载中…</p></div>
-  </section>
-
-  <!-- 出场统计 (right) -->
-  <section class="card col-right">
-    <div class="card-header"><h2>出场类型统计</h2></div>
-    <div id="exit-chart-wrap">
-      <canvas id="exit-canvas" width="120" height="120"></canvas>
-      <div id="exit-legend"></div>
+    <div class="ov-card">
+      <div class="ov-label">今日已赚 / 已亏</div>
+      <div class="ov-value" id="ov-rpnl">-</div>
+      <div class="ov-sub" id="ov-rpnl-sub">已结算</div>
     </div>
-  </section>
-
-  <!-- PnL 历史折线 (full width) -->
-  <section class="card col-full">
-    <div class="card-header"><h2>已实现 PnL 历史</h2></div>
-    <div id="pnl-chart-wrap"><canvas id="pnl-canvas" width="900" height="120"></canvas></div>
-  </section>
-
-  <!-- 实时日志 (full width) -->
-  <section class="card col-full">
-    <div class="card-header">
-      <h2>实时日志 (cycle.log)</h2>
-      <button class="btn btn-sm" onclick="clearLog()">清空</button>
+    <div class="ov-card">
+      <div class="ov-label">正在观察的币</div>
+      <div class="ov-value blue" id="ov-cands">-</div>
+      <div class="ov-sub" id="ov-cands-age">机器人候选列表</div>
     </div>
-    <pre id="log-output"></pre>
-  </section>
+  </div>
+
+  <!-- Positions -->
+  <div class="section">
+    <div class="section-header">
+      <div class="section-title">📊 当前持仓</div>
+    </div>
+    <div id="positions-area"></div>
+  </div>
+
+  <!-- Watchlist + Activity -->
+  <div style="display:grid; grid-template-columns: 1fr 1fr; gap: 16px;">
+
+    <!-- Watchlist -->
+    <div class="section">
+      <div class="section-header">
+        <div class="section-title">🔍 机器人正在关注</div>
+        <div class="section-meta" id="watchlist-age"></div>
+      </div>
+      <div id="watchlist-area"><div class="empty-state"><p>加载中…</p></div></div>
+    </div>
+
+    <!-- Activity -->
+    <div class="section">
+      <div class="section-header">
+        <div class="section-title">📋 最近发生了什么</div>
+      </div>
+      <div class="tab-bar">
+        <button class="tab-btn active" onclick="switchTab('all')">全部</button>
+        <button class="tab-btn" onclick="switchTab('trade')">交易</button>
+        <button class="tab-btn" onclick="switchTab('skip')">无操作</button>
+      </div>
+      <div id="activity-area"><div class="empty-state"><p>加载中…</p></div></div>
+    </div>
+  </div>
+
+  <!-- PnL History -->
+  <div class="section">
+    <div class="section-header">
+      <div class="section-title">📈 累计盈亏曲线</div>
+      <div class="section-meta" id="pnl-total-label"></div>
+    </div>
+    <div id="pnl-chart-wrap"><canvas id="pnl-canvas" height="100"></canvas></div>
+    <div class="footer-bar" id="pnl-footer"></div>
+  </div>
+
+  <!-- Stats -->
+  <div class="section">
+    <div class="section-header">
+      <div class="section-title">📊 出场方式统计</div>
+    </div>
+    <div class="stats-grid" id="exit-stats-area">
+      <div class="empty-state" style="grid-column:1/-1"><p>加载中…</p></div>
+    </div>
+  </div>
+
 </main>
 
 <script>
 /* ─── helpers ─── */
 function fmtTime(ms) {
   if (!ms) return '-';
-  return new Date(ms).toLocaleString('zh-CN', {hour12: false});
+  const d = new Date(ms);
+  const now = new Date();
+  if (d.toDateString() === now.toDateString()) {
+    return '今天 ' + d.toLocaleTimeString('zh-CN', {hour12: false, hour:'2-digit', minute:'2-digit'});
+  }
+  return d.toLocaleDateString('zh-CN', {month:'numeric', day:'numeric'}) + ' ' +
+         d.toLocaleTimeString('zh-CN', {hour12: false, hour:'2-digit', minute:'2-digit'});
 }
 function fmtAge(ms) {
   const s = Math.floor((Date.now() - ms) / 1000);
-  if (s < 60) return s + 's';
-  if (s < 3600) return Math.floor(s / 60) + 'm';
-  return Math.floor(s / 3600) + 'h' + Math.floor((s % 3600) / 60) + 'm';
+  if (s < 60) return s + '秒前';
+  if (s < 3600) return Math.floor(s / 60) + '分钟前';
+  if (s < 86400) return Math.floor(s / 3600) + '小时前';
+  return Math.floor(s / 86400) + '天前';
 }
 function fmtVol(v) {
   if (v >= 1e9) return (v / 1e9).toFixed(1) + 'B';
-  if (v >= 1e6) return (v / 1e6).toFixed(1) + 'M';
+  if (v >= 1e6) return (v / 1e6).toFixed(0) + 'M';
   return v.toFixed(0);
 }
-function pnlClass(v) { return v === null ? '' : v >= 0 ? 'pos' : 'neg'; }
-function pnlSign(v)  { return v > 0 ? '+' : ''; }
+function pnlStr(v, suffix='U') {
+  if (v === null || v === undefined) return '-';
+  return (v >= 0 ? '+' : '') + v.toFixed(2) + suffix;
+}
+function pnlClass(v) {
+  if (v === null || v === undefined) return 'gray';
+  return v >= 0 ? 'green' : 'red';
+}
+function heatDots(score, max=10) {
+  const filled = Math.round(Math.min(score / max * 5, 5));
+  return Array.from({length:5}, (_,i) =>
+    `<div class="heat-dot${i < filled ? ' on' : ''}"></div>`).join('');
+}
 
-/* ─── sorting state for candidates ─── */
-let candSort = { key: 'score', dir: -1 };
-let candData = [];
-
-/* ─── journal filter state ─── */
-let journalFilter = 'all';
-let journalData   = [];
-const EVENT_TYPES = ['all', 'decision', 'open', 'close', 'skip', 'error'];
+/* ─── tab state ─── */
+let activeTab = 'all';
+let journalData = [];
+function switchTab(t) {
+  activeTab = t;
+  document.querySelectorAll('.tab-btn').forEach(b =>
+    b.classList.toggle('active', b.textContent.trim() === {all:'全部',trade:'交易',skip:'无操作'}[t]));
+  renderActivity();
+}
 
 /* ─── countdown ─── */
-let nextRefresh = Date.now() + 30000;
+let nextRefreshTs = Date.now() + 30000;
 setInterval(() => {
-  const s = Math.max(0, Math.ceil((nextRefresh - Date.now()) / 1000));
-  document.getElementById('countdown').textContent = `刷新倒计时 ${s}s`;
+  const s = Math.max(0, Math.ceil((nextRefreshTs - Date.now()) / 1000));
+  document.getElementById('next-run').textContent = s > 0 ? `${s}s 后刷新` : '刷新中…';
 }, 1000);
 
 /* ─── status ─── */
 async function loadStatus() {
   const r = await fetch('/api/status').then(r => r.json());
-  const b = document.getElementById('status-badge');
-  b.textContent = r.running ? '运行中' : '已停止';
-  b.className = 'badge ' + (r.running ? 'badge-run' : 'badge-stop');
+  const pill = document.getElementById('status-pill');
+  const dot  = document.getElementById('status-dot');
+  const txt  = document.getElementById('status-text');
+  if (r.running) {
+    pill.className = 'status-pill status-on';
+    dot.className = 'dot dot-on';
+    txt.textContent = '运行中 — 每30分钟自动分析一次';
+  } else {
+    pill.className = 'status-pill status-off';
+    dot.className = 'dot dot-off';
+    txt.textContent = '已停止';
+  }
 }
 
 /* ─── positions ─── */
+let positionSymbols = new Set();
 async function loadPositions() {
   const data = await fetch('/api/positions').then(r => r.json());
-  const el = document.getElementById('positions-container');
+  positionSymbols = new Set(data.map(p => p.symbol));
 
-  // summary
-  document.getElementById('s-count').textContent = data.length;
-  document.getElementById('s-count').className = data.length >= 3 ? 'value warn' : 'value pos';
+  // overview
   const totalPnl = data.reduce((a, p) => a + (p.unrealized_pnl_usdt ?? 0), 0);
-  const upnlEl = document.getElementById('s-upnl');
-  upnlEl.textContent = (totalPnl >= 0 ? '+' : '') + totalPnl.toFixed(2) + 'U';
-  upnlEl.className = 'value ' + pnlClass(totalPnl);
-  document.getElementById('s-upnl-sub').textContent = data.length ? `${data.length} 个持仓合计` : '无持仓';
+  document.getElementById('ov-count').textContent = data.length;
+  document.getElementById('ov-count-sub').textContent =
+    data.length === 0 ? '当前空仓' : `还可以再开 ${3 - data.length} 个`;
+  document.getElementById('ov-upnl').textContent = pnlStr(totalPnl);
+  document.getElementById('ov-upnl').className = 'ov-value ' + pnlClass(totalPnl);
+  document.getElementById('ov-upnl-sub').textContent = data.length ? '所有持仓合计，未结算' : '暂无持仓';
 
-  if (!data.length) { el.innerHTML = '<p class="empty">无持仓</p>'; return; }
+  const area = document.getElementById('positions-area');
+  if (!data.length) {
+    area.innerHTML = `<div class="empty-state">
+      <div class="emoji">💤</div>
+      <p>当前没有持仓，机器人在等待好机会</p>
+    </div>`;
+    return;
+  }
 
-  const MAX_SL = 10; // from strategy
-  el.innerHTML = `<table>
-    <tr>
-      <th>Symbol</th><th>入场价</th><th>Mark价</th>
-      <th>保证金</th><th>杠杆</th>
-      <th>未实现PnL</th><th>涨幅(杠杆后)</th>
-      <th>止损距离</th><th>模式</th><th>持仓时长</th><th>操作</th>
-    </tr>
-    ${data.map(p => {
-      const pnl     = p.unrealized_pnl_usdt;
-      const pnlAbs  = Math.abs(pnl ?? 0);
-      const barPct  = pnl !== null ? Math.min(100, (pnlAbs / MAX_SL) * 100) : 0;
-      const slPct   = pnl !== null ? Math.min(100, ((MAX_SL + pnl) / MAX_SL) * 100) : 100;
-      return `<tr>
-        <td><b>${p.symbol}</b></td>
-        <td class="dim">${p.entry_price}</td>
-        <td>${p.mark_price ?? '-'}</td>
-        <td class="dim">${p.size_usdt}U</td>
-        <td class="dim">${p.leverage}x</td>
-        <td class="pnl-cell">
-          <div class="pnl-bar-wrap">
-            <span class="${pnlClass(pnl)}">${pnl !== null ? pnlSign(pnl) + pnl.toFixed(2) + 'U' : '-'}</span>
-            <div class="pnl-bar-bg"><div class="pnl-bar-fill ${pnl >= 0 ? 'pnl-bar-pos' : 'pnl-bar-neg'}" style="width:${barPct}%"></div></div>
-          </div>
-        </td>
-        <td class="${pnlClass(p.pnl_pct)}">${p.pnl_pct !== null ? pnlSign(p.pnl_pct) + p.pnl_pct.toFixed(1) + '%' : '-'}</td>
-        <td>
-          <div class="sl-bar-wrap">
-            <div class="sl-bar-bg"><div class="sl-bar-fill" style="width:${slPct}%"></div></div>
-            <span class="dim" style="font-size:10px">${pnl !== null ? (MAX_SL + pnl).toFixed(2) + 'U' : '-'}</span>
-          </div>
-        </td>
-        <td class="dim">${p.mode}</td>
-        <td class="dim">${fmtAge(p.entry_ts_ms)}</td>
-        <td><button class="btn btn-sm btn-danger" onclick="closePosition('${p.symbol}')">平仓</button></td>
-      </tr>`;
-    }).join('')}
-  </table>`;
+  const MAX_SL = 10;
+  area.innerHTML = `<div class="pos-grid">${data.map(p => {
+    const pnl = p.unrealized_pnl_usdt;
+    const slRemain = MAX_SL + (pnl ?? 0);
+    const slPct = Math.min(100, Math.max(0, slRemain / MAX_SL * 100));
+    const slBarCls = slPct > 60 ? 'sl-bar-ok' : slPct > 30 ? 'sl-bar-warn' : 'sl-bar-danger';
+    const isLong = (p.side || 'LONG') === 'LONG';
+    const dirLabel = isLong
+      ? '做多（买涨）'
+      : '做空（买跌）';
+    const dirCls = isLong ? 'dir-long' : 'dir-short';
+    const cardCls = isLong ? 'pos-long' : 'pos-short';
+    const coin = p.symbol.replace('USDT', '');
+    const heldFor = fmtAge(p.entry_ts_ms).replace('前','');
+    const pnlDesc = pnl === null ? '获取中…'
+      : pnl >= 0 ? `当前浮盈 ${pnl.toFixed(2)}U，继续持有中`
+      : `当前浮亏 ${Math.abs(pnl).toFixed(2)}U，止损保护中`;
+    const entryPct = p.pnl_pct !== null ? `${p.pnl_pct >= 0 ? '+' : ''}${p.pnl_pct?.toFixed(1)}%` : '-';
+
+    return `<div class="pos-card ${cardCls}">
+      <div class="pos-coin">${coin}</div>
+      <span class="pos-dir ${dirCls}">${dirLabel}</span>
+      <div class="pos-pnl ${pnlClass(pnl)}">${pnlStr(pnl)}</div>
+      <div class="pos-pnl-desc">${pnlDesc}</div>
+      <div class="pos-row">
+        <span class="pos-row-label">买入价格</span>
+        <span class="pos-row-val">${p.entry_price}</span>
+      </div>
+      <div class="pos-row">
+        <span class="pos-row-label">当前价格</span>
+        <span class="pos-row-val">${p.mark_price ?? '-'}</span>
+      </div>
+      <div class="pos-row">
+        <span class="pos-row-label">涨跌幅（含杠杆）</span>
+        <span class="pos-row-val ${pnlClass(p.pnl_pct)}">${entryPct}</span>
+      </div>
+      <div class="pos-row">
+        <span class="pos-row-label">投入保证金</span>
+        <span class="pos-row-val">${p.size_usdt}U × ${p.leverage}倍杠杆</span>
+      </div>
+      <div class="pos-row">
+        <span class="pos-row-label">持仓时长</span>
+        <span class="pos-row-val">${heldFor}</span>
+      </div>
+      <div style="margin-top:10px">
+        <div style="display:flex; justify-content:space-between; font-size:11px; color:#aaa; margin-bottom:4px">
+          <span>止损保护余量</span>
+          <span>${slRemain > 0 ? slRemain.toFixed(2) + 'U 后触发止损' : '即将触发止损'}</span>
+        </div>
+        <div class="sl-bar-outer"><div class="sl-bar-inner ${slBarCls}" style="width:${slPct}%"></div></div>
+      </div>
+      <button class="close-btn" onclick="closePosition('${p.symbol}')">手动平仓</button>
+    </div>`;
+  }).join('')}</div>`;
 }
 
-/* ─── candidates ─── */
-async function loadCandidates() {
+/* ─── watchlist ─── */
+async function loadWatchlist() {
   const data = await fetch('/api/candidates').then(r => r.json());
-  candData = data.candidates ?? [];
-  const tsEl = document.getElementById('candidates-ts');
-  const s_cands = document.getElementById('s-cands');
-  const s_age   = document.getElementById('s-cands-age');
-  s_cands.textContent = candData.length;
+  const longs  = data.candidates ?? [];
+  const shorts = data.short_candidates ?? [];
+  const all    = [...longs, ...shorts];
+  all.sort((a, b) => b.score - a.score);
 
+  document.getElementById('ov-cands').textContent = all.length;
+
+  const ageEl = document.getElementById('watchlist-age');
   if (data.generated_at_ms) {
     const age = Date.now() - data.generated_at_ms;
-    const stale = age > 10 * 60 * 1000;
-    tsEl.textContent = fmtTime(data.generated_at_ms) + ' (' + fmtAge(data.generated_at_ms) + ' 前)';
-    tsEl.className = stale ? 'meta stale' : 'meta';
-    s_age.textContent = fmtAge(data.generated_at_ms) + ' 前';
-    s_age.className = stale ? 'sub stale' : 'sub';
-  }
-  renderCandidates();
-}
-
-function renderCandidates() {
-  const el = document.getElementById('candidates-container');
-  if (!candData.length) { el.innerHTML = '<p class="empty">无数据</p>'; return; }
-
-  // get held symbols
-  const heldSymbols = new Set(
-    Array.from(document.querySelectorAll('#positions-container td:first-child b'))
-         .map(b => b.textContent)
-  );
-
-  const sorted = [...candData].sort((a, b) =>
-    candSort.dir * ((b[candSort.key] ?? 0) - (a[candSort.key] ?? 0))
-  );
-
-  function thSort(key, label) {
-    const cls = candSort.key === key ? (candSort.dir === -1 ? 'sort-desc' : 'sort-asc') : '';
-    return `<th class="sortable ${cls}" onclick="sortCands('${key}')">${label}</th>`;
+    ageEl.textContent = fmtAge(data.generated_at_ms) + '更新';
+    ageEl.className = age > 600000 ? 'section-meta stale-text' : 'section-meta';
+    document.getElementById('ov-cands-age').textContent = fmtAge(data.generated_at_ms) + '更新';
   }
 
-  el.innerHTML = `<table>
-    <tr>
-      <th>#</th>
-      ${thSort('symbol', 'Symbol')}
-      ${thSort('last_price', '价格')}
-      ${thSort('price_change_pct', '24h涨幅')}
-      ${thSort('quote_volume_usdt', '成交量')}
-      ${thSort('oi_change_1h_pct', 'OI变化1h')}
-      ${thSort('score', '评分')}
-      <th>提及</th>
-    </tr>
-    ${sorted.map((c, i) => {
-      const held = heldSymbols.has(c.symbol);
-      const rowStyle = held ? 'background:#0d1e0d;' : '';
-      return `<tr style="${rowStyle}">
-        <td class="dim">${i + 1}</td>
-        <td>${c.symbol}${held ? ' <span style="color:#4caf50;font-size:10px">●持仓</span>' : ''}</td>
-        <td class="dim">${c.last_price}</td>
-        <td class="${c.price_change_pct >= 0 ? 'pos' : 'neg'}">${pnlSign(c.price_change_pct)}${c.price_change_pct.toFixed(1)}%</td>
-        <td class="dim">${fmtVol(c.quote_volume_usdt)}</td>
-        <td class="${c.oi_change_1h_pct >= 0 ? 'pos' : 'neg'}">${pnlSign(c.oi_change_1h_pct)}${c.oi_change_1h_pct.toFixed(1)}%</td>
-        <td><b>${c.score.toFixed(1)}</b></td>
-        <td class="dim">${c.square_mentions || 0}</td>
-      </tr>`;
-    }).join('')}
-  </table>`;
-}
-
-function sortCands(key) {
-  if (candSort.key === key) candSort.dir *= -1;
-  else { candSort.key = key; candSort.dir = -1; }
-  renderCandidates();
-}
-
-/* ─── journal ─── */
-async function loadJournal() {
-  journalData = await fetch('/api/journal').then(r => r.json());
-  renderJournalFilters();
-  renderJournal();
-}
-
-function renderJournalFilters() {
-  const el = document.getElementById('journal-filters');
-  el.innerHTML = EVENT_TYPES.map(t => `
-    <button class="filter-btn ${journalFilter === t ? 'active' : ''}" onclick="setJournalFilter('${t}')">
-      ${t === 'all' ? '全部' : t}
-    </button>`).join('');
-}
-
-function setJournalFilter(t) {
-  journalFilter = t;
-  renderJournalFilters();
-  renderJournal();
-}
-
-function renderJournal() {
-  const el = document.getElementById('journal-container');
-  const filtered = journalFilter === 'all'
-    ? journalData
-    : journalData.filter(e => e.event === journalFilter);
-  if (!filtered.length) { el.innerHTML = '<p class="empty">无记录</p>'; return; }
-  el.innerHTML = `<table>
-    <tr><th>时间</th><th>类型</th><th>Symbol</th><th>详情</th></tr>
-    ${filtered.map(e => {
-      const tag = `<span class="tag tag-${e.event}">${e.event}</span>`;
-      let detail = '';
-      if (e.event === 'decision') {
-        const opens  = (e.open  || []).map(o => o.symbol).join(', ');
-        const closes = (e.close || []).map(c => c.symbol).join(', ');
-        detail = [opens && '开:' + opens, closes && '关:' + closes, e.skip_reason].filter(Boolean).join(' | ').slice(0, 120);
-      } else if (e.event === 'open') {
-        detail = `入场 ${e.price} × ${e.leverage}x = ${e.notional_usdt}U  手续费:${e.fee_usdt}U`;
-      } else if (e.event === 'close') {
-        const pnl = e.net_pnl_usdt;
-        detail = `<span class="${pnl >= 0 ? 'pos' : 'neg'}">${pnlSign(pnl)}${pnl?.toFixed(2)}U</span> 出场 ${e.exit_price} [${e.exit_trigger || 'signal_decay'}]`;
-      } else if (e.event === 'exit_triggered') {
-        detail = `${e.exit_type || '-'} | ${(e.reason || '').slice(0, 72)}`;
-      } else if (e.event === 'stop_loss_triggered') {
-        detail = `<span class="neg">触发止损</span> mark=${e.mark} pnl=${e.pnl_usdt?.toFixed(2)}U`;
-      } else if (e.event === 'skip') {
-        detail = (e.reason || '').slice(0, 100);
-      } else if (e.event === 'error') {
-        detail = `<span class="neg">${(e.error || e.message || '').slice(0, 80)}</span>`;
-      }
-      return `<tr>
-        <td class="dim">${fmtTime(e.ts_ms)}</td>
-        <td>${tag}</td>
-        <td>${e.symbol || ''}</td>
-        <td style="color:#999">${detail}</td>
-      </tr>`;
-    }).join('')}
-  </table>`;
-}
-
-/* ─── exit stats pie chart ─── */
-const PIE_COLORS = {
-  hard_sl:      '#f44336',
-  trailing_tp:  '#4caf50',
-  time_stop:    '#ffd54f',
-  signal_decay: '#64b5f6',
-};
-const PIE_LABELS = {
-  hard_sl:      '硬止损',
-  trailing_tp:  '追踪止盈',
-  time_stop:    '时间止损',
-  signal_decay: '信号衰减',
-};
-
-async function loadExitStats() {
-  const data = await fetch('/api/exit-stats').then(r => r.json());
-  const canvas = document.getElementById('exit-canvas');
-  const legend = document.getElementById('exit-legend');
-  const total  = data.total_closes;
-
-  if (!total) {
-    legend.innerHTML = '<span style="color:#333">暂无平仓记录</span>';
-    const ctx = canvas.getContext('2d');
-    ctx.clearRect(0, 0, 120, 120);
-    ctx.strokeStyle = '#222'; ctx.lineWidth = 1;
-    ctx.beginPath(); ctx.arc(60, 60, 50, 0, Math.PI * 2); ctx.stroke();
+  const area = document.getElementById('watchlist-area');
+  if (!all.length) {
+    area.innerHTML = `<div class="empty-state">
+      <div class="emoji">🔎</div>
+      <p>当前市场没有达到标准的币种<br><span style="font-size:12px;color:#aaa">机器人会在下次扫描时继续寻找</span></p>
+    </div>`;
     return;
   }
 
-  // draw pie
-  const ctx = canvas.getContext('2d');
-  ctx.clearRect(0, 0, 120, 120);
-  const keys = ['hard_sl', 'trailing_tp', 'time_stop', 'signal_decay'];
-  let startAngle = -Math.PI / 2;
-  keys.forEach(k => {
-    const frac = data[k] / total;
-    if (!frac) return;
-    const end = startAngle + frac * 2 * Math.PI;
-    ctx.beginPath();
-    ctx.moveTo(60, 60);
-    ctx.arc(60, 60, 52, startAngle, end);
-    ctx.closePath();
-    ctx.fillStyle = PIE_COLORS[k];
-    ctx.fill();
-    startAngle = end;
-  });
-  // center hole
-  ctx.beginPath(); ctx.arc(60, 60, 30, 0, Math.PI * 2);
-  ctx.fillStyle = '#111'; ctx.fill();
-  ctx.fillStyle = '#888'; ctx.font = 'bold 14px monospace';
-  ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
-  ctx.fillText(total, 60, 60);
-
-  // legend
-  legend.innerHTML = keys.filter(k => data[k]).map(k => `
-    <div class="legend-item">
-      <div class="legend-dot" style="background:${PIE_COLORS[k]}"></div>
-      <span style="color:#999">${PIE_LABELS[k]}</span>
-      <span style="color:#666">${data[k]} (${(100 * data[k] / total).toFixed(0)}%)</span>
-    </div>`).join('');
+  area.innerHTML = `<div class="watch-list">${all.slice(0, 10).map((c, i) => {
+    const coin = c.symbol.replace('USDT', '');
+    const isShort = (c.side || 'LONG') === 'SHORT';
+    const held = positionSymbols.has(c.symbol);
+    const gainSign = c.price_change_pct >= 0 ? '+' : '';
+    const dirBadge = isShort
+      ? `<span class="watch-dir-badge watch-short">做空</span>`
+      : `<span class="watch-dir-badge watch-long">做多</span>`;
+    const sub = isShort
+      ? `暴涨后多空对决减弱，机器人考虑做空`
+      : `24小时价格上涨，市场热度上升`;
+    return `<div class="watch-item">
+      <div class="watch-rank">${i + 1}</div>
+      <div style="flex:1">
+        <div class="watch-coin">
+          ${coin}
+          ${held ? '<span class="watch-held">● 持仓中</span>' : ''}
+        </div>
+        <div class="watch-sub">${sub}</div>
+      </div>
+      ${dirBadge}
+      <div class="watch-gain ${c.price_change_pct >= 0 ? 'green' : 'red'}">
+        ${gainSign}${c.price_change_pct.toFixed(1)}%
+      </div>
+      <div class="watch-heat">
+        <div class="heat-dots">${heatDots(c.score)}</div>
+        <div class="heat-text">${c.score.toFixed(0)}分</div>
+      </div>
+    </div>`;
+  }).join('')}</div>`;
 }
 
-/* ─── realized PnL history sparkline ─── */
+/* ─── activity ─── */
+async function loadActivity() {
+  journalData = await fetch('/api/journal?n=30').then(r => r.json());
+  renderActivity();
+}
+
+function renderActivity() {
+  const area = document.getElementById('activity-area');
+  let filtered = journalData;
+  if (activeTab === 'trade') filtered = journalData.filter(e => e.event === 'open' || e.event === 'close' || e.event === 'exit_triggered' || e.event === 'stop_loss_triggered');
+  if (activeTab === 'skip')  filtered = journalData.filter(e => e.event === 'decision' || e.event === 'skip');
+
+  if (!filtered.length) {
+    area.innerHTML = `<div class="empty-state"><p>暂无记录</p></div>`;
+    return;
+  }
+
+  area.innerHTML = `<div class="timeline">${filtered.map(e => {
+    let icon, iconCls, title, desc;
+    const coin = (e.symbol || '').replace('USDT', '');
+    const side = e.side || 'LONG';
+    const dir  = side === 'SHORT' ? '做空' : '做多';
+
+    if (e.event === 'open') {
+      icon = side === 'SHORT' ? '📉' : '📈';
+      iconCls = 'ic-buy';
+      title = `机器人${dir}买入了 ${coin}`;
+      desc  = `买入价 ${e.price}，投入 ${e.size_usdt}U 保证金，${e.leverage}倍杠杆`;
+    } else if (e.event === 'close') {
+      const pnl = e.net_pnl_usdt;
+      const profit = pnl >= 0;
+      icon = profit ? '✅' : '❌';
+      iconCls = profit ? 'ic-buy' : 'ic-sell';
+      title = `卖出 ${coin}，${profit ? '盈利' : '亏损'} <span class="tl-pnl ${profit ? 'green' : 'red'}">${pnlStr(pnl)}</span>`;
+      const triggerMap = {hard_sl:'止损触发', trailing_tp:'止盈触发', time_stop:'持仓超时', signal_decay:'信号减弱'};
+      desc = `出场原因：${triggerMap[e.exit_trigger] || e.exit_trigger || '手动'}，出场价 ${e.exit_price}`;
+    } else if (e.event === 'stop_loss_triggered') {
+      icon = '🛡️'; iconCls = 'ic-sl';
+      title = `止损保护触发 — ${coin}`;
+      desc  = `亏损达到上限，自动卖出保护本金`;
+    } else if (e.event === 'exit_triggered') {
+      icon = '🎯'; iconCls = 'ic-sell';
+      title = `自动出场 — ${coin}`;
+      desc  = (e.reason || '').slice(0, 80);
+    } else if (e.event === 'decision') {
+      const opens  = (e.open  || []).map(o => o.symbol.replace('USDT', '')).join('、');
+      const closes = (e.close || []).map(c => c.symbol.replace('USDT', '')).join('、');
+      if (opens || closes) {
+        icon = '🤖'; iconCls = 'ic-think';
+        title = '机器人做出了决定';
+        desc  = [opens && `准备买入：${opens}`, closes && `准备卖出：${closes}`].filter(Boolean).join('；');
+      } else {
+        icon = '💭'; iconCls = 'ic-skip';
+        title = '本轮分析结束，没有操作';
+        desc  = e.skip_reason ? simplifySkipReason(e.skip_reason) : '暂时没有符合条件的机会';
+      }
+    } else if (e.event === 'skip') {
+      icon = '⏭️'; iconCls = 'ic-skip';
+      title = '跳过本轮';
+      desc  = simplifySkipReason(e.reason || '');
+    } else if (e.event === 'error') {
+      icon = '⚠️'; iconCls = 'ic-error';
+      title = '出现了一个错误';
+      desc  = (e.error || e.message || '').slice(0, 80);
+    } else {
+      return '';
+    }
+
+    return `<div class="tl-item">
+      <div class="tl-icon ${iconCls}">${icon}</div>
+      <div class="tl-body">
+        <div class="tl-title">${title}</div>
+        ${desc ? `<div class="tl-desc">${desc}</div>` : ''}
+        <div class="tl-time">${fmtTime(e.ts_ms)}</div>
+      </div>
+    </div>`;
+  }).filter(Boolean).join('')}</div>`;
+}
+
+function simplifySkipReason(reason) {
+  if (reason.includes('older than 10 minutes')) return '市场数据过期，等待下次扫描';
+  if (reason.includes('cap_reached'))           return '已达到最大持仓数量（3个）';
+  if (reason.includes('daily_loss'))            return '今日亏损已达上限，暂停开仓';
+  if (reason.includes('cooldown'))              return '止损冷却中，暂停开仓';
+  if (reason.includes('no candidate'))          return '没有找到符合条件的币种';
+  return reason.slice(0, 80);
+}
+
+/* ─── PnL chart ─── */
 async function loadPnlChart() {
   const journal = await fetch('/api/journal?n=200').then(r => r.json());
-  // collect close events sorted oldest first
-  const closes = journal.filter(e => e.event === 'close')
-                         .sort((a, b) => a.ts_ms - b.ts_ms);
+  const closes = journal.filter(e => e.event === 'close').sort((a, b) => a.ts_ms - b.ts_ms);
+
+  const today_pnl = closes.filter(c => c.ts_ms >= Date.now() - 86400000)
+                          .reduce((a, c) => a + (c.net_pnl_usdt ?? 0), 0);
+  const total_pnl = closes.reduce((a, c) => a + (c.net_pnl_usdt ?? 0), 0);
+
+  document.getElementById('ov-rpnl').textContent = pnlStr(today_pnl);
+  document.getElementById('ov-rpnl').className = 'ov-value ' + pnlClass(today_pnl);
+  document.getElementById('ov-rpnl-sub').textContent =
+    `共 ${closes.filter(c => c.ts_ms >= Date.now() - 86400000).length} 笔已结算`;
+
+  const labelEl = document.getElementById('pnl-total-label');
+  labelEl.textContent = `累计 ${pnlStr(total_pnl)}`;
+  labelEl.className = 'section-meta ' + pnlClass(total_pnl);
+
+  // footer
+  const wins = closes.filter(c => (c.net_pnl_usdt ?? 0) > 0).length;
+  const total = closes.length;
+  document.getElementById('pnl-footer').innerHTML = total ? `
+    <span class="footer-stat">总交易次数 <b>${total}</b></span>
+    <span class="footer-stat">盈利次数 <b class="green">${wins}</b></span>
+    <span class="footer-stat">亏损次数 <b class="red">${total - wins}</b></span>
+    <span class="footer-stat">胜率 <b>${(wins/total*100).toFixed(0)}%</b></span>
+    <span class="footer-stat">累计盈亏 <b class="${pnlClass(total_pnl)}">${pnlStr(total_pnl)}</b></span>
+  ` : '<span class="footer-stat">暂无交易记录</span>';
 
   const canvas = document.getElementById('pnl-canvas');
-  const W = canvas.parentElement.offsetWidth - 32 || 860;
-  canvas.width = W;
+  const W = canvas.parentElement.offsetWidth - 40 || 800;
+  canvas.width = W; canvas.height = 100;
   const ctx = canvas.getContext('2d');
-  ctx.clearRect(0, 0, W, 120);
+  ctx.clearRect(0, 0, W, 100);
 
   if (!closes.length) {
-    ctx.fillStyle = '#333'; ctx.font = '12px monospace';
-    ctx.textAlign = 'center'; ctx.fillText('暂无平仓记录', W / 2, 60);
-
-    // update summary
-    document.getElementById('s-rpnl').textContent = '0.00U';
-    document.getElementById('s-rpnl').className = 'value dim';
+    ctx.fillStyle = '#ccc'; ctx.font = '13px sans-serif';
+    ctx.textAlign = 'center'; ctx.fillText('暂无交易记录', W/2, 50);
     return;
   }
 
-  // cumulative PnL
   let cum = 0;
   const points = closes.map(c => { cum += c.net_pnl_usdt ?? 0; return cum; });
-  const today_pnl = closes.filter(c => c.ts_ms >= Date.now() - 86400000)
-                           .reduce((a, c) => a + (c.net_pnl_usdt ?? 0), 0);
-
-  // update summary
-  const rpnlEl = document.getElementById('s-rpnl');
-  rpnlEl.textContent = pnlSign(today_pnl) + today_pnl.toFixed(2) + 'U';
-  rpnlEl.className = 'value ' + pnlClass(today_pnl);
-  document.getElementById('s-rpnl-sub').textContent = '今日 ' + closes.filter(c => c.ts_ms >= Date.now() - 86400000).length + ' 笔';
-
-  const minV = Math.min(0, ...points);
-  const maxV = Math.max(0, ...points);
+  const minV = Math.min(0, ...points), maxV = Math.max(0, ...points);
   const range = maxV - minV || 1;
-  const pad = 16;
-  const H = 120 - pad * 2;
+  const pad = 12;
+  const H = 100 - pad * 2;
+  const toY = v => pad + H - ((v - minV) / range) * H;
+  const toX = i => pad + (i / Math.max(points.length - 1, 1)) * (W - pad * 2);
+  const finalPositive = points[points.length - 1] >= 0;
 
-  function toY(v) { return pad + H - ((v - minV) / range) * H; }
-  function toX(i) { return pad + (i / Math.max(points.length - 1, 1)) * (W - pad * 2); }
-
-  // zero line
-  ctx.strokeStyle = '#2a2a2a'; ctx.lineWidth = 1; ctx.setLineDash([4, 4]);
-  ctx.beginPath(); ctx.moveTo(pad, toY(0)); ctx.lineTo(W - pad, toY(0)); ctx.stroke();
+  ctx.strokeStyle = '#e5e7eb'; ctx.lineWidth = 1; ctx.setLineDash([4,4]);
+  ctx.beginPath(); ctx.moveTo(pad, toY(0)); ctx.lineTo(W-pad, toY(0)); ctx.stroke();
   ctx.setLineDash([]);
 
-  // fill under curve
+  const color = finalPositive ? '#10b981' : '#ef4444';
   ctx.beginPath(); ctx.moveTo(toX(0), toY(0));
   points.forEach((v, i) => ctx.lineTo(toX(i), toY(v)));
-  ctx.lineTo(toX(points.length - 1), toY(0));
-  ctx.closePath();
-  const grad = ctx.createLinearGradient(0, 0, 0, 120);
-  grad.addColorStop(0, 'rgba(76,175,80,0.3)');
-  grad.addColorStop(1, 'rgba(76,175,80,0.0)');
+  ctx.lineTo(toX(points.length-1), toY(0)); ctx.closePath();
+  const grad = ctx.createLinearGradient(0, 0, 0, 100);
+  grad.addColorStop(0, color + '40'); grad.addColorStop(1, color + '00');
   ctx.fillStyle = grad; ctx.fill();
 
-  // line
-  ctx.strokeStyle = '#4caf50'; ctx.lineWidth = 1.5; ctx.lineJoin = 'round';
+  ctx.strokeStyle = color; ctx.lineWidth = 2; ctx.lineJoin = 'round';
   ctx.beginPath();
   points.forEach((v, i) => i === 0 ? ctx.moveTo(toX(i), toY(v)) : ctx.lineTo(toX(i), toY(v)));
   ctx.stroke();
-
-  // last value label
-  const lastX = toX(points.length - 1);
-  const lastY = toY(points[points.length - 1]);
-  ctx.fillStyle = '#4caf50'; ctx.font = '11px monospace'; ctx.textAlign = 'right';
-  ctx.fillText(pnlSign(cum) + cum.toFixed(2) + 'U', W - pad, lastY - 6);
 }
 
-/* ─── bot actions ─── */
+/* ─── exit stats ─── */
+async function loadExitStats() {
+  const data = await fetch('/api/exit-stats').then(r => r.json());
+  const area = document.getElementById('exit-stats-area');
+  const total = data.total_closes;
+  if (!total) {
+    area.innerHTML = `<div class="empty-state" style="grid-column:1/-1"><p>暂无平仓记录</p></div>`;
+    return;
+  }
+  const items = [
+    { key: 'trailing_tp', label: '🎯 止盈离场', desc: '赚够了自动卖出', color: '#10b981' },
+    { key: 'hard_sl',     label: '🛡️ 止损保护', desc: '亏损达到上限保本', color: '#ef4444' },
+    { key: 'time_stop',   label: '⏰ 持仓超时', desc: '持有超6小时自动出场', color: '#f59e0b' },
+    { key: 'signal_decay',label: '📉 信号减弱', desc: '机器人判断机会结束', color: '#6366f1' },
+  ];
+  area.innerHTML = items.map(it => {
+    const count = data[it.key] || 0;
+    const pct = total ? (count / total * 100).toFixed(0) : 0;
+    return `<div class="stat-item">
+      <div class="stat-num" style="color:${it.color}">${count}</div>
+      <div style="font-size:14px; font-weight:600; margin-top:6px">${it.label}</div>
+      <div class="stat-lbl">${it.desc}</div>
+      <div style="font-size:12px; color:#aaa; margin-top:4px">占比 ${pct}%</div>
+    </div>`;
+  }).join('');
+}
+
+/* ─── actions ─── */
 async function botAction(action) {
-  const r = await fetch('/api/bot/' + action, {method: 'POST'}).then(r => r.json());
-  if (!r.ok) alert('失败: ' + (r.error || r.stderr || '未知错误'));
+  const r = await fetch('/api/bot/' + action, {method:'POST'}).then(r => r.json());
+  if (!r.ok) alert('操作失败: ' + (r.error || r.stderr || '未知错误'));
   await loadStatus();
 }
-
 async function triggerCollect() {
-  const r = await fetch('/api/bot/collect', {method: 'POST'}).then(r => r.json()).catch(() => ({ok: false}));
-  if (!r.ok) alert('采集触发失败 (需要后端支持)');
-  else { await loadCandidates(); }
+  await fetch('/api/bot/collect', {method:'POST'});
+  setTimeout(loadWatchlist, 3000);
 }
-
 async function triggerCycle() {
-  const r = await fetch('/api/bot/cycle', {method: 'POST'}).then(r => r.json()).catch(() => ({ok: false}));
-  if (!r.ok) alert('决策触发失败 (需要后端支持)');
+  await fetch('/api/bot/cycle', {method:'POST'});
 }
-
 async function closePosition(symbol) {
-  if (!confirm(`确认平仓 ${symbol}?`)) return;
-  const r = await fetch('/api/positions/close', {method: 'POST', headers: {'Content-Type': 'application/json'},
-                         body: JSON.stringify({symbol})}).then(r => r.json()).catch(() => ({ok: false}));
+  const coin = symbol.replace('USDT', '');
+  if (!confirm(`确认手动平仓 ${coin}？\n\n平仓后盈亏将立即结算。`)) return;
+  const r = await fetch('/api/positions/close', {
+    method:'POST', headers:{'Content-Type':'application/json'},
+    body: JSON.stringify({symbol})
+  }).then(r => r.json()).catch(() => ({ok:false}));
   if (!r.ok) alert('平仓失败: ' + (r.error || '未知错误'));
   else await loadPositions();
 }
 
-function clearLog() { document.getElementById('log-output').textContent = ''; }
-
-/* ─── main refresh ─── */
+/* ─── main ─── */
 async function loadAll() {
-  await Promise.all([loadStatus(), loadPositions(), loadCandidates(), loadJournal(), loadExitStats(), loadPnlChart()]);
-  document.getElementById('refresh-info').textContent = '更新于 ' + new Date().toLocaleTimeString('zh-CN', {hour12: false});
-  nextRefresh = Date.now() + 30000;
+  await Promise.all([loadStatus(), loadPositions(), loadPnlChart(), loadExitStats()]);
+  await Promise.all([loadWatchlist(), loadActivity()]);
+  nextRefreshTs = Date.now() + 30000;
 }
 
 loadAll();
 setInterval(loadAll, 30000);
-
-/* ─── SSE log stream ─── */
-const logEl = document.getElementById('log-output');
-const evtSrc = new EventSource('/stream/logs');
-evtSrc.onmessage = e => {
-  logEl.textContent += e.data + '\n';
-  const lines = logEl.textContent.split('\n');
-  if (lines.length > 500) logEl.textContent = lines.slice(-500).join('\n');
-  logEl.scrollTop = logEl.scrollHeight;
-};
-evtSrc.onerror = () => { logEl.textContent += '[日志连接断开]\n'; };
 </script>
 </body>
 </html>

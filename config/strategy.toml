@@ -24,6 +24,12 @@ top_n_candidates = 20
 enabled = false                 # enable after square scraper is built
 top_n_trending = 20
 
+[short_filters]
+enabled = true
+min_squeeze_pct = 30.0          # price gain threshold to consider squeeze fade short
+min_volume_usdt = 5_000_000
+top_n = 5
+
 [risk]
 # Account-level circuit breakers. Evaluated pre-open in execute.py.
 # Set any to 0 to disable that gate.

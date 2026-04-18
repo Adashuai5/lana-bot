@@ -34,6 +34,7 @@ class Candidate:
     liquidity_score: float
     score: float
     square_mentions: int = 0  # populated later when square scraper lands
+    side: str = "LONG"  # "LONG" | "SHORT"
 
 
 def _slope(points: list[float]) -> float:
@@ -239,10 +240,53 @@ def build_candidates(square_mentions: dict[str, int] | None = None) -> dict:
     candidates.sort(key=lambda c: c.score, reverse=True)
     top = candidates[: filters["top_n_candidates"]]
 
+    # Short candidates: squeeze fades (price up sharply + OI dropping)
+    short_cfg = cfg.get("short_filters", {})
+    short_candidates: list[Candidate] = []
+    if short_cfg.get("enabled", False):
+        min_squeeze_pct = float(short_cfg.get("min_squeeze_pct", 30.0))
+        min_volume = float(short_cfg.get("min_volume_usdt", filters["min_24h_volume_usdt"]))
+        for t in tickers:
+            if not t.symbol.endswith("USDT"):
+                continue
+            if t.price_change_pct < min_squeeze_pct:
+                continue
+            if t.quote_volume < min_volume:
+                continue
+            if any(c.symbol == t.symbol for c in top):
+                continue  # already a long candidate
+            try:
+                pts = fetch_oi_history(t.symbol, period="5m", limit=49)
+                oi_4h = oi_change_pct(pts)
+                oi_1h = oi_change_pct(pts[-13:] if len(pts) >= 13 else pts)
+            except Exception:  # noqa: BLE001
+                continue
+            if oi_4h >= 0:
+                continue  # not a squeeze — real momentum, skip short
+            liquidity_score = _bounded_score(_zscore([math.log10(max(t.quote_volume, 1.0))])[0])
+            score = min(t.price_change_pct / 10.0, 5.0) + abs(oi_4h) / 10.0 + liquidity_score
+            short_candidates.append(Candidate(
+                symbol=t.symbol,
+                last_price=t.last_price,
+                price_change_pct=t.price_change_pct,
+                quote_volume_usdt=t.quote_volume,
+                oi_change_1h_pct=oi_1h,
+                oi_change_4h_pct=oi_4h,
+                trend_score=0.0,
+                oi_score=0.0,
+                liquidity_score=liquidity_score,
+                score=score,
+                side="SHORT",
+            ))
+        short_candidates.sort(key=lambda c: c.score, reverse=True)
+        short_candidates = short_candidates[:short_cfg.get("top_n", 5)]
+        logger.info("short candidates: {}", len(short_candidates))
+
     return {
         "generated_at_ms": int(time.time() * 1000),
         "regime": regime,
         "count": len(top),
         "candidates": [asdict(c) for c in top],
+        "short_candidates": [asdict(c) for c in short_candidates],
         "filter_reason_stats": dict(filter_reason_stats),
     }

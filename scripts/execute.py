@@ -108,8 +108,12 @@ def main(decision_path: Path) -> int:
             )
             break
 
+        side = item.get("side", "LONG").upper()
         try:
-            client.open_long(symbol, size, leverage)
+            if side == "SHORT":
+                client.open_short(symbol, size, leverage)
+            else:
+                client.open_long(symbol, size, leverage)
             current += 1
         except Exception as e:  # noqa: BLE001
             logger.error("open failed for {}: {}", symbol, e)

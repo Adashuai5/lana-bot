@@ -26,7 +26,7 @@ def get_client() -> ExchangeClient:
     keys = exchange_keys().get(ex, {})
     if ex == "binance":
         from lana_bot.execution.binance import BinanceFutures
-        client = BinanceFutures(keys["api_key"], keys["api_secret"])
+        client = BinanceFutures(keys["api_key"], keys["api_secret"], proxy=keys.get("proxy"))
         _assert_live_client_ready(ex, client)
         return client
     if ex == "gate":

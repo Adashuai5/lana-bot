@@ -9,6 +9,7 @@ dependencies = [
     "loguru>=0.7",
     "playwright>=1.45",
     "flask>=3.0",
+    "requests>=2.33.1",
 ]
 
 [build-system]

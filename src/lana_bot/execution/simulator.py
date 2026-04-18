@@ -60,6 +60,44 @@ class Simulator:
             leverage=leverage, ts_ms=ts,
         )
 
+    def open_short(self, symbol: str, size_usdt: float, leverage: int) -> FillResult:
+        if positions.find(symbol) is not None:
+            raise ValueError(f"already have position in {symbol}")
+        price = fetch_mark_price(symbol)
+        notional = size_usdt * leverage
+        fee = notional * TAKER_FEE
+        ts = int(time.time() * 1000)
+
+        pos = positions.Position(
+            symbol=symbol,
+            side="SHORT",
+            entry_price=price,
+            size_usdt=size_usdt,
+            leverage=leverage,
+            notional_usdt=notional,
+            entry_ts_ms=ts,
+            mode="dry",
+        )
+        positions.add(pos)
+        journal.log(
+            "open",
+            {
+                "symbol": symbol,
+                "side": "SHORT",
+                "price": price,
+                "size_usdt": size_usdt,
+                "leverage": leverage,
+                "notional_usdt": notional,
+                "fee_usdt": fee,
+                "mode": "dry",
+            },
+        )
+        logger.info("[dry] OPEN SHORT {} @ {} notional={}", symbol, price, notional)
+        return FillResult(
+            symbol=symbol, side="SHORT", price=price, size_usdt=size_usdt,
+            leverage=leverage, ts_ms=ts,
+        )
+
     def close(self, symbol: str, exit_trigger: str = "signal_decay") -> FillResult:
         pos = positions.find(symbol)
         if pos is None:
@@ -67,7 +105,10 @@ class Simulator:
         price = fetch_mark_price(symbol)
         ts = int(time.time() * 1000)
 
-        pnl_usdt = (price - pos.entry_price) / pos.entry_price * pos.notional_usdt
+        price_move = (price - pos.entry_price) / pos.entry_price
+        if pos.side == "SHORT":
+            price_move = -price_move
+        pnl_usdt = price_move * pos.notional_usdt
         fee = pos.notional_usdt * TAKER_FEE
         net_pnl = pnl_usdt - fee * 2  # entry + exit fees
 

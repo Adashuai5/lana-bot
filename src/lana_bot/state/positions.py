@@ -19,7 +19,7 @@ POSITIONS_FILE = DATA_DIR / "positions.json"
 @dataclass
 class Position:
     symbol: str
-    side: str              # "LONG" only, per strategy
+    side: str              # "LONG" | "SHORT"
     entry_price: float
     size_usdt: float       # collateral (margin) committed
     leverage: int

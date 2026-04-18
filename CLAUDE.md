@@ -20,15 +20,21 @@ decision file, invoke the executor, then stop.
 ## What you do each cycle
 
 1. **Read inputs** (all paths relative to project root):
-   - `data/candidates/latest.json` — current top candidates with scores.
-   - `data/positions.json` — currently open positions.
+   - `data/candidates/latest.json` — current top candidates with scores (both
+     `candidates` for longs and `short_candidates` for squeeze-fade shorts).
+   - `data/positions.json` — currently open positions (side: LONG or SHORT).
    - `tail -n 30 data/journal.ndjson` — recent events (opens, closes, stop-loss
      triggers, past decisions). Learn from these.
 
 2. **Decide.** For each candidate, ask:
-   - Is momentum real (gain + OI confirming)? OI up with price up = strong. OI
-     up with price flat = watch. OI down with price up = short squeeze risk.
-   - Do we already hold it? (If yes, skip — never double up.)
+   - **Longs** (`candidates`): Is momentum real (gain + OI confirming)? OI up
+     with price up = strong. OI up with price flat = watch. OI down with price
+     up = short squeeze risk (skip for long).
+   - **Shorts** (`short_candidates`): Price surged >30% but OI is dropping =
+     squeeze exhaustion. Short these only when the squeeze looks spent (price
+     slowing, OI still falling). High conviction required — meme pumps can
+     extend far.
+   - Do we already hold it? (If yes, skip — never double up, regardless of side.)
    - Would this exceed `max_concurrent_positions` (currently 3)?
    - Against recent journal: have we already opened/stopped-out of this
      symbol in the last few hours? If so, require a notably stronger signal.
@@ -41,11 +47,17 @@ decision file, invoke the executor, then stop.
 
    ```json
    {
-     "open":  [{"symbol": "RAVEUSDT", "size_usdt": 20, "reason": "..."}],
+     "open":  [
+       {"symbol": "RAVEUSDT", "side": "LONG",  "size_usdt": 20, "reason": "..."},
+       {"symbol": "ALPACAUSDT", "side": "SHORT", "size_usdt": 20, "reason": "391% squeeze, OI flat — fade"}
+     ],
      "close": [{"symbol": "FOOUSDT",  "reason": "..."}],
      "skip_reason": "no candidate clean enough"
    }
    ```
+
+   `side` defaults to `"LONG"` if omitted. Use `"SHORT"` only for squeeze-fade
+   entries from `short_candidates`.
 
    Use `size_usdt` from `strategy.toml` (`position_size_usdt`) unless you have
    a strong reason to deviate — prefer `null` to let execute.py fill defaults.
