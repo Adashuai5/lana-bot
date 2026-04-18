@@ -22,6 +22,12 @@ def main(decision_path: Path) -> int:
     logger.add(LOGS_DIR / "execute.log", rotation="10 MB", retention="14 days")
     cfg = strategy()
     client = get_client()
+    logger.warning(
+        "[安全告警] 即将执行交易流程 exchange={} live_trading={} client={}",
+        cfg["exchange"],
+        cfg["live_trading"],
+        client.name,
+    )
     logger.info("execute with client={} live={}", client.name, cfg["live_trading"])
 
     decision = json.loads(decision_path.read_text())
