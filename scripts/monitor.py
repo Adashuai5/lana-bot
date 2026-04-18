@@ -61,13 +61,17 @@ def main() -> int:
 
     while True:
         try:
-            cfg = strategy()
             # live_trading flag may flip mid-run — refetch the client each loop
             # so dry→live switch requires only a config reload here too.
             from lana_bot.config import reload as _reload
             _reload()
+            cfg = strategy()
             client = get_client()
             max_loss = float(cfg["max_stop_loss_per_position_usdt"])
+            logger.info(
+                "monitor config: max_stop_loss_per_position_usdt={}",
+                max_loss,
+            )
             check_once(client, max_loss)
         except Exception as e:  # noqa: BLE001
             logger.error("monitor loop error: {}", e)
