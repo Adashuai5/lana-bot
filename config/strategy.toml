@@ -24,5 +24,7 @@ top_n_trending = 20
 # Account-level circuit breakers. Evaluated pre-open in execute.py.
 # Set any to 0 to disable that gate.
 max_daily_loss_usdt = 30        # halt opens once 24h realized PnL ≤ -30U (~30% of capital)
+max_unrealized_drawdown_usdt = 20 # halt opens once combined unrealized PnL ≤ -20U
+max_sector_exposure_pct = 60     # cap single-theme (e.g. meme cluster) exposure vs initial capital
 max_daily_opens = 12            # cap opens per 24h (~cycle cadence * 3 candidates)
 stop_loss_cooldown_min = 60     # pause opens for N min after any stop-loss trigger
