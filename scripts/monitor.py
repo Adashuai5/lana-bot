@@ -70,8 +70,17 @@ def check_once(client, max_loss: float, exit_cfg: ExitRuleConfig) -> None:
             try:
                 client.close(pos.symbol, exit_trigger="hard_sl")
                 journal.log(
-                    "exit_triggered",
-                    {"symbol": pos.symbol, "exit_type": "hard_sl", "mark": mark, "pnl_usdt": pnl},
+journal.log(
+    "stop_loss_triggered",
+    {
+        "symbol": pos.symbol,
+        "exit_type": "hard_sl",  # 👈 新增（关键）
+        "mark": mark,
+        "pnl_usdt": pnl,
+        "max_loss_usdt": max_loss,
+        "loss_basis": "unrealized_pnl_on_notional_usdt",
+    },
+)
                 )
                 state.pop(pos.symbol, None)
                 changed = True
@@ -144,14 +153,21 @@ def main() -> int:
             cfg = strategy()
             client = get_client()
             max_loss = float(cfg["max_stop_loss_per_position_usdt"])
-            ecfg = cfg.get("exit_rules", {})
-            exit_cfg = ExitRuleConfig(
-                risk_multiple_tp=float(ecfg.get("risk_multiple_tp", 1.5)),
-                risk_multiple_tp_close_fraction=float(ecfg.get("risk_multiple_tp_close_fraction", 0.5)),
-                trailing_drawdown_usdt=float(ecfg.get("trailing_drawdown_usdt", 3)),
-                max_hold_seconds=int(ecfg.get("max_hold_seconds", 6 * 60 * 60)),
-            )
-            check_once(client, max_loss, exit_cfg)
+ecfg = cfg.get("exit_rules", {})
+exit_cfg = ExitRuleConfig(
+    risk_multiple_tp=float(ecfg.get("risk_multiple_tp", 1.5)),
+    risk_multiple_tp_close_fraction=float(ecfg.get("risk_multiple_tp_close_fraction", 0.5)),
+    trailing_drawdown_usdt=float(ecfg.get("trailing_drawdown_usdt", 3)),
+    max_hold_seconds=int(ecfg.get("max_hold_seconds", 6 * 60 * 60)),
+)
+
+logger.info(
+    "monitor config: max_stop_loss_per_position_usdt={}, exit_cfg={}",
+    max_loss,
+    exit_cfg,
+)
+
+check_once(client, max_loss, exit_cfg)
         except Exception as e:  # noqa: BLE001
             logger.error("monitor loop error: {}", e)
             journal.log("error", {"op": "monitor_loop", "error": str(e)})

@@ -4,7 +4,11 @@
 live_trading = false            # MUST stay false until dry-run validation passes
 exchange = "binance"            # "binance" | "gate"
 initial_capital_usdt = 100
-max_stop_loss_per_position_usdt = 10    # 10% of capital per position
+# Stop-loss口径（唯一定义）：按"未实现PnL(USDT)"触发，PnL基于名义价值(notional)计算。
+# 触发条件：unrealized_pnl_usdt <= -max_stop_loss_per_position_usdt
+# 示例：position_size_usdt=20, leverage=10 -> notional=200U；若 max_stop_loss_per_position_usdt=10，
+# 则等价于保证金亏损50%（10/20）或名义价值回撤5%（10/200）。
+max_stop_loss_per_position_usdt = 10
 max_concurrent_positions = 3
 position_size_usdt = 20         # collateral per position (notional = 20 * leverage)
 leverage = 10
@@ -24,11 +28,30 @@ top_n_trending = 20
 # Account-level circuit breakers. Evaluated pre-open in execute.py.
 # Set any to 0 to disable that gate.
 max_daily_loss_usdt = 30        # halt opens once 24h realized PnL ≤ -30U (~30% of capital)
+max_unrealized_drawdown_usdt = 20 # halt opens once combined unrealized PnL ≤ -20U
+max_sector_exposure_pct = 60     # cap single-theme (e.g. meme cluster) exposure vs initial capital
 max_daily_opens = 12            # cap opens per 24h (~cycle cadence * 3 candidates)
 stop_loss_cooldown_min = 60     # pause opens for N min after any stop-loss trigger
 
 [exit_rules]
-risk_multiple_tp = 1.5                  # +1.5R 触发盈利保护
-risk_multiple_tp_close_fraction = 0.5   # 记录计划减仓比例（当前执行层按全平处理）
-trailing_drawdown_usdt = 3              # 触发后，从浮盈高点回撤达到该值则止盈
-max_hold_seconds = 21600                # 最大持仓时长，6h
+risk_multiple_tp = 1.5
+risk_multiple_tp_close_fraction = 0.5
+trailing_drawdown_usdt = 3
+max_hold_seconds = 21600
+
+[regime]
+enabled = false
+execute_gate_enabled = false
+reduce_size_multiplier = 0.5
+
+trend_lookback_bars_4h = 30
+trend_drift_up_pct_4h = 0.02
+trend_drift_down_pct_4h = 0.02
+
+breadth_allow_min = 0.52
+breadth_reduce_min = 0.45
+
+vol_window_hours = 24
+vol_history_hours = 336
+vol_allow_quantile_max = 0.75
+vol_reduce_quantile_max = 0.90

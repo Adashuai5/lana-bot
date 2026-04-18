@@ -9,6 +9,7 @@ from lana_bot.execution.base import FillResult
 
 class GateFutures:
     name = "gate"
+    is_stub = True
 
     def __init__(self, api_key: str, api_secret: str) -> None:
         self.api_key = api_key

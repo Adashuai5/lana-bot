@@ -11,7 +11,7 @@ decision file, invoke the executor, then stop.
 - Inputs: Binance 24h tickers (gain + volume) + OI change + (later) Binance
   Square mention counts, all pre-ranked into a candidate list for you.
 - Per position: 10x leverage, 20U collateral → 200U notional, hard stop loss at
-  -200U (Python daemon enforces, not you).
+  unrealized PnL ≤ -10U（由 Python daemon 执行；PnL 按名义价值计算）。
 - Max 3 concurrent positions.
 - **Phase 1 (now): dry-run only** — `live_trading=false` in
   `config/strategy.toml`. You can be bolder for learning purposes, but the
@@ -75,7 +75,7 @@ decision file, invoke the executor, then stop.
 
 - Fetching market data (collect.py).
 - Executing orders / simulating fills (execute.py + simulator.py).
-- Stop-loss at -200U per position (monitor.py, runs continuously).
+- Stop-loss at unrealized PnL ≤ -10U per position（monitor.py 持续执行；名义价值口径）。
 - Position state (positions.py).
 
 Your job is pure judgment on top of pre-digested data. Keep it tight.
