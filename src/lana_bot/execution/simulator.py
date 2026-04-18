@@ -98,21 +98,26 @@ class Simulator:
             leverage=leverage, ts_ms=ts,
         )
 
-    def close(self, symbol: str, exit_trigger: str = "signal_decay") -> FillResult:
+    def close(self, symbol: str, exit_trigger: str = "signal_decay", fraction: float = 1.0) -> FillResult:
         pos = positions.find(symbol)
         if pos is None:
             raise ValueError(f"no position to close for {symbol}")
         price = fetch_mark_price(symbol)
         ts = int(time.time() * 1000)
 
+        closed_notional = pos.notional_usdt * fraction
         price_move = (price - pos.entry_price) / pos.entry_price
         if pos.side == "SHORT":
             price_move = -price_move
-        pnl_usdt = price_move * pos.notional_usdt
-        fee = pos.notional_usdt * TAKER_FEE
-        net_pnl = pnl_usdt - fee * 2  # entry + exit fees
+        pnl_usdt = price_move * closed_notional
+        fee = closed_notional * TAKER_FEE
+        net_pnl = pnl_usdt - fee * 2  # proportional entry + exit fees
 
-        positions.remove(symbol)
+        if fraction >= 1.0:
+            positions.remove(symbol)
+        else:
+            positions.reduce(symbol, fraction)
+
         journal.log(
             "close",
             {
@@ -125,13 +130,15 @@ class Simulator:
                 "net_pnl_usdt": net_pnl,
                 "held_ms": ts - pos.entry_ts_ms,
                 "mode": "dry",
+                **({"close_fraction": fraction} if fraction < 1.0 else {}),
             },
         )
         logger.info(
-            "[dry] CLOSE {} @ {} (entry {}) pnl={:.2f}U trigger={}",
-            symbol, price, pos.entry_price, net_pnl, exit_trigger,
+            "[dry] CLOSE {}{} @ {} (entry {}) pnl={:.2f}U trigger={}",
+            symbol, f" {fraction:.0%}" if fraction < 1.0 else "",
+            price, pos.entry_price, net_pnl, exit_trigger,
         )
         return FillResult(
-            symbol=symbol, side="CLOSE", price=price, size_usdt=pos.size_usdt,
+            symbol=symbol, side="CLOSE", price=price, size_usdt=pos.size_usdt * fraction,
             leverage=pos.leverage, ts_ms=ts,
         )

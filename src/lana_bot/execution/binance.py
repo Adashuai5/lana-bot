@@ -173,18 +173,31 @@ class BinanceFutures:
             size_usdt=size_usdt, leverage=leverage, ts_ms=ts,
         )
 
-    def close(self, symbol: str, exit_trigger: str = "signal_decay") -> FillResult:
+    def close(self, symbol: str, exit_trigger: str = "signal_decay", fraction: float = 1.0) -> FillResult:
         pos = positions.find(symbol)
         if pos is None:
             raise ValueError(f"no position to close for {symbol}")
 
         close_side = "BUY" if pos.side == "SHORT" else "SELL"
-        resp = self._post("/fapi/v1/order", {
-            "symbol": symbol,
-            "side": close_side,
-            "type": "MARKET",
-            "closePosition": "true",
-        })
+        closed_notional = pos.notional_usdt * fraction
+
+        if fraction >= 1.0:
+            resp = self._post("/fapi/v1/order", {
+                "symbol": symbol,
+                "side": close_side,
+                "type": "MARKET",
+                "closePosition": "true",
+            })
+        else:
+            price_for_qty = fetch_mark_price(symbol)
+            qty = self._round_qty(symbol, closed_notional / price_for_qty)
+            resp = self._post("/fapi/v1/order", {
+                "symbol": symbol,
+                "side": close_side,
+                "type": "MARKET",
+                "quantity": qty,
+                "reduceOnly": "true",
+            })
 
         price = fetch_mark_price(symbol)
         fill_price = float(resp["avgPrice"]) if float(resp.get("avgPrice", 0)) else price
@@ -193,11 +206,15 @@ class BinanceFutures:
         price_move = (fill_price - pos.entry_price) / pos.entry_price
         if pos.side == "SHORT":
             price_move = -price_move
-        pnl_usdt = price_move * pos.notional_usdt
-        fee = pos.notional_usdt * TAKER_FEE
+        pnl_usdt = price_move * closed_notional
+        fee = closed_notional * TAKER_FEE
         net_pnl = pnl_usdt - fee * 2
 
-        positions.remove(symbol)
+        if fraction >= 1.0:
+            positions.remove(symbol)
+        else:
+            positions.reduce(symbol, fraction)
+
         journal.log("close", {
             "symbol": symbol,
             "exit_trigger": exit_trigger,
@@ -209,12 +226,14 @@ class BinanceFutures:
             "held_ms": ts - pos.entry_ts_ms,
             "mode": "live",
             "order_id": resp.get("orderId"),
+            **({"close_fraction": fraction} if fraction < 1.0 else {}),
         })
         logger.info(
-            "[live] CLOSE {} @ {} (entry {}) pnl={:.2f}U trigger={}",
-            symbol, fill_price, pos.entry_price, net_pnl, exit_trigger,
+            "[live] CLOSE {}{} @ {} (entry {}) pnl={:.2f}U trigger={}",
+            symbol, f" {fraction:.0%}" if fraction < 1.0 else "",
+            fill_price, pos.entry_price, net_pnl, exit_trigger,
         )
         return FillResult(
             symbol=symbol, side="CLOSE", price=fill_price,
-            size_usdt=pos.size_usdt, leverage=pos.leverage, ts_ms=ts,
+            size_usdt=pos.size_usdt * fraction, leverage=pos.leverage, ts_ms=ts,
         )

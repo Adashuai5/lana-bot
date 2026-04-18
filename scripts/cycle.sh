@@ -1,11 +1,9 @@
 #!/bin/zsh
 # One full decision cycle: collect → ask Claude to decide → execute.
-# Called by launchd every 30 min.
+# Called by launchd every 30 min and by fast_scan on new surge signals.
 export https_proxy=http://127.0.0.1:7890
 export http_proxy=http://127.0.0.1:7890
 
-nano scripts/cycle.sh
-# 开头添加：
 source ~/.zshrc
 export PATH="/usr/local/bin:$PATH"
 
@@ -15,7 +13,15 @@ PROJECT="/Users/ada/lana-bot"
 cd "$PROJECT"
 
 LOG="$PROJECT/logs/cycle.log"
+LOCK="/tmp/lana-bot-cycle.lock"
 mkdir -p "$PROJECT/logs" "$PROJECT/data/decisions"
+
+# Prevent concurrent cycles (fast_scan + launchd can both trigger this)
+exec 9>"$LOCK"
+if ! flock -n 9; then
+  echo "$(date -Iseconds) cycle already running, skipping" >> "$LOG"
+  exit 0
+fi
 
 {
   echo "=== cycle start $(date -Iseconds) ==="

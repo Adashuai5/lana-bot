@@ -68,7 +68,7 @@ def evaluate_all(client, max_loss: float, exit_cfg: ExitRuleConfig) -> None:
             decision.exit_type, pos.symbol, pnl, hold_seconds, decision.reason,
         )
         try:
-            client.close(pos.symbol, exit_trigger=decision.exit_type)
+            client.close(pos.symbol, exit_trigger=decision.exit_type, fraction=decision.close_fraction)
             journal.log(
                 "exit_triggered",
                 {
@@ -80,7 +80,8 @@ def evaluate_all(client, max_loss: float, exit_cfg: ExitRuleConfig) -> None:
                     "close_fraction": decision.close_fraction,
                 },
             )
-            state.pop(pos.symbol, None)
+            if decision.close_fraction >= 1.0:
+                state.pop(pos.symbol, None)
             changed = True
         except Exception as e:  # noqa: BLE001
             logger.error("close failed during {} for {}: {}", decision.exit_type, pos.symbol, e)

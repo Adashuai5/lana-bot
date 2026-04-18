@@ -65,3 +65,25 @@ def remove(symbol: str) -> Position | None:
             _write(state)
             return removed
     return None
+
+
+def reduce(symbol: str, fraction: float) -> Position | None:
+    """Close `fraction` of a position in-place. Returns a Position sized to the closed portion."""
+    state = _read()
+    for p in state["positions"]:
+        if p["symbol"] == symbol:
+            closed = Position(
+                symbol=p["symbol"],
+                side=p["side"],
+                entry_price=p["entry_price"],
+                size_usdt=p["size_usdt"] * fraction,
+                leverage=p["leverage"],
+                notional_usdt=p["notional_usdt"] * fraction,
+                entry_ts_ms=p["entry_ts_ms"],
+                mode=p["mode"],
+            )
+            p["size_usdt"] = round(p["size_usdt"] * (1 - fraction), 8)
+            p["notional_usdt"] = round(p["notional_usdt"] * (1 - fraction), 8)
+            _write(state)
+            return closed
+    return None
