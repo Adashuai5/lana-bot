@@ -15,8 +15,26 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))
 from lana_bot.config import DATA_DIR, LOGS_DIR, strategy  # noqa: E402
 from lana_bot.data.market_regime import decide_regime_gate  # noqa: E402
 from lana_bot.execution import get_client  # noqa: E402
-from lana_bot.risk.circuit_breaker import check_can_open  # noqa: E402
+from lana_bot.risk.circuit_breaker import DAY_MS, _iter_recent_events, daily_realized_pnl_usdt  # noqa: E402
+from lana_bot.risk.risk_engine import can_open as _risk_can_open  # noqa: E402
 from lana_bot.state import journal, positions  # noqa: E402
+
+
+def _constraint_check(item: dict, cfg: dict, current: int) -> str | None:
+    """Hard constraint filter on AI decisions. Returns rejection reason or None if allowed.
+
+    Runs before circuit_breaker — AI suggestions are rejected here on hard rule violations.
+    """
+    cap = int(cfg["max_concurrent_positions"])
+    if current >= cap:
+        return f"cap_reached: {current}/{cap}"
+    risk = cfg.get("risk", {})
+    daily_loss_limit = float(risk.get("max_daily_loss_usdt", 0) or 0)
+    if daily_loss_limit > 0:
+        realized = daily_realized_pnl_usdt(_iter_recent_events(DAY_MS))
+        if realized <= -daily_loss_limit:
+            return f"daily_loss_cap: {realized:.2f}U"
+    return None
 
 
 def _resolve_regime_snapshot(decision: dict) -> dict:
@@ -68,9 +86,7 @@ def main(decision_path: Path) -> int:
             logger.error("close failed for {}: {}", symbol, e)
             journal.log("error", {"op": "close", "symbol": symbol, "error": str(e)})
 
-    # Respect max_concurrent_positions cap
     current = len(positions.list_positions())
-    cap = cfg["max_concurrent_positions"]
 
     for item in decision.get("open", []):
         if gate and gate.state == "block":
@@ -78,18 +94,21 @@ def main(decision_path: Path) -> int:
             journal.log("skip", {"reason": "regime_block", "symbol": item["symbol"], "details": gate.reasons})
             break
 
-        if current >= cap:
-            logger.warning("position cap reached ({}), skipping remaining opens", cap)
-            journal.log("skip", {"reason": "cap_reached", "symbol": item["symbol"]})
+        symbol = item["symbol"]
+
+        # Hard constraint filter — AI suggestion rejected before circuit_breaker
+        rejection = _constraint_check(item, cfg, current)
+        if rejection:
+            logger.warning("constraint filter rejected {}: {}", symbol, rejection)
+            journal.log("skip", {"reason": rejection, "symbol": symbol, "layer": "constraint_filter"})
             break
 
-        symbol = item["symbol"]
         size = item["size_usdt"] if item.get("size_usdt") else cfg["position_size_usdt"]
         if gate and gate.state == "reduce":
             size = round(float(size) * gate.size_multiplier, 8)
         leverage = item["leverage"] if item.get("leverage") else cfg["leverage"]
 
-        breaker = check_can_open(
+        breaker = _risk_can_open(
             cfg,
             pending_symbol=symbol,
             pending_size_usdt=size,

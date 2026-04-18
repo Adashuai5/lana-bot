@@ -20,8 +20,12 @@ app = Flask(__name__, template_folder=str(ROOT / "templates"))
 JOURNAL     = ROOT / "data" / "journal.ndjson"
 CANDIDATES  = ROOT / "data" / "candidates" / "latest.json"
 LOG_FILE    = ROOT / "logs" / "cycle.log"
-CYCLE_LABEL = "com.lana-bot.cycle"
-PLIST       = Path.home() / "Library/LaunchAgents/com.lana-bot.cycle.plist"
+CYCLE_LABEL    = "com.lanabot.cycle"
+FASTSCAN_LABEL = "com.lanabot.fastscan"
+MONITOR_LABEL  = "com.lanabot.monitor"
+PLIST_CYCLE    = Path.home() / "Library/LaunchAgents/com.lanabot.cycle.plist"
+PLIST_FASTSCAN = Path.home() / "Library/LaunchAgents/com.lanabot.fastscan.plist"
+PLIST_MONITOR  = Path.home() / "Library/LaunchAgents/com.lanabot.monitor.plist"
 
 
 def _bot_running() -> bool:
@@ -69,6 +73,25 @@ def api_journal():
     n = min(int(request.args.get("n", 20)), 500)
     lines = JOURNAL.read_text().strip().splitlines()
     return jsonify([json.loads(l) for l in reversed(lines[-n:])])
+
+
+@app.get("/api/fast-scan")
+def api_fast_scan():
+    state_file = ROOT / "data" / "fast_scan_state.json"
+    if not state_file.exists():
+        return jsonify({"enabled": False})
+    try:
+        s = json.loads(state_file.read_text())
+        s["enabled"] = True
+        return jsonify(s)
+    except Exception:
+        return jsonify({"enabled": False})
+
+
+@app.get("/api/square-status")
+def api_square_status():
+    from lana_bot.data.binance_square import get_square_status
+    return jsonify(get_square_status())
 
 
 @app.get("/api/exit-stats")
@@ -125,18 +148,27 @@ def api_close_position():
 
 @app.post("/api/bot/start")
 def bot_start():
-    if not PLIST.exists():
-        return jsonify({"ok": False, "error": f"{PLIST} not found"}), 400
-    r = subprocess.run(["launchctl", "load", str(PLIST)], capture_output=True, text=True)
-    return jsonify({"ok": r.returncode == 0, "stderr": r.stderr})
+    errors = []
+    for plist in [PLIST_CYCLE, PLIST_FASTSCAN, PLIST_MONITOR]:
+        if not plist.exists():
+            errors.append(f"{plist.name} not found")
+            continue
+        r = subprocess.run(["launchctl", "load", str(plist)], capture_output=True, text=True)
+        if r.returncode != 0:
+            errors.append(r.stderr.strip())
+    return jsonify({"ok": len(errors) == 0, "errors": errors})
 
 
 @app.post("/api/bot/stop")
 def bot_stop():
-    if not PLIST.exists():
-        return jsonify({"ok": False, "error": f"{PLIST} not found"}), 400
-    r = subprocess.run(["launchctl", "unload", str(PLIST)], capture_output=True, text=True)
-    return jsonify({"ok": r.returncode == 0, "stderr": r.stderr})
+    errors = []
+    for plist in [PLIST_CYCLE, PLIST_FASTSCAN, PLIST_MONITOR]:
+        if not plist.exists():
+            continue
+        r = subprocess.run(["launchctl", "unload", str(plist)], capture_output=True, text=True)
+        if r.returncode != 0:
+            errors.append(r.stderr.strip())
+    return jsonify({"ok": True, "errors": errors})
 
 
 @app.get("/stream/logs")

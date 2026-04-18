@@ -44,17 +44,19 @@ header h1 span { color: #7c83fd; }
 #next-run { color: rgba(255,255,255,0.45); font-size: 12px; }
 
 /* ── Layout ── */
-main { padding: 20px 24px; max-width: 1200px; margin: 0 auto; display: grid; gap: 16px; }
+main { padding: 12px 20px; max-width: 1400px; margin: 0 auto; display: grid; gap: 12px; }
 
 /* ── Overview cards ── */
-.overview { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; }
-.ov-card {
-  background: #fff; border-radius: 12px; padding: 18px 20px;
+.overview-card {
+  background: #fff; border-radius: 12px; padding: 12px 16px;
   box-shadow: 0 1px 4px rgba(0,0,0,0.06);
 }
-.ov-label { font-size: 12px; color: #888; margin-bottom: 8px; font-weight: 500; letter-spacing: 0.3px; }
-.ov-value { font-size: 28px; font-weight: 700; line-height: 1; }
-.ov-sub   { font-size: 12px; color: #aaa; margin-top: 6px; }
+.overview-grid { display: grid; grid-template-columns: repeat(4,1fr); gap: 0; }
+.ov-card { padding: 8px 12px; border-right: 1px solid #f0f0f0; }
+.ov-card:last-child { border-right: none; }
+.ov-label { font-size: 11px; color: #888; margin-bottom: 4px; font-weight: 500; }
+.ov-value { font-size: 20px; font-weight: 700; line-height: 1; }
+.ov-sub   { font-size: 11px; color: #aaa; margin-top: 3px; }
 .green { color: #10b981; }
 .red   { color: #ef4444; }
 .gray  { color: #9ca3af; }
@@ -63,11 +65,11 @@ main { padding: 20px 24px; max-width: 1200px; margin: 0 auto; display: grid; gap
 /* ── Section ── */
 .section { background: #fff; border-radius: 12px; box-shadow: 0 1px 4px rgba(0,0,0,0.06); overflow: hidden; }
 .section-header {
-  padding: 16px 20px; border-bottom: 1px solid #f0f0f0;
+  padding: 10px 16px; border-bottom: 1px solid #f0f0f0;
   display: flex; align-items: center; gap: 10px;
 }
-.section-title { font-size: 15px; font-weight: 600; color: #1a1a2e; flex: 1; }
-.section-meta  { font-size: 12px; color: #aaa; }
+.section-title { font-size: 13px; font-weight: 600; color: #1a1a2e; flex: 1; }
+.section-meta  { font-size: 11px; color: #aaa; }
 .stale-text { color: #f59e0b !important; }
 .section-body { padding: 16px 20px; }
 
@@ -109,7 +111,7 @@ main { padding: 20px 24px; max-width: 1200px; margin: 0 auto; display: grid; gap
 /* ── Watchlist ── */
 .watch-list { padding: 8px 0; }
 .watch-item {
-  display: flex; align-items: center; padding: 10px 20px; gap: 12px;
+  display: flex; align-items: center; padding: 8px 16px; gap: 10px;
   border-bottom: 1px solid #f9f9f9; transition: background .1s;
 }
 .watch-item:last-child { border-bottom: none; }
@@ -129,11 +131,11 @@ main { padding: 20px 24px; max-width: 1200px; margin: 0 auto; display: grid; gap
 .watch-held  { font-size: 11px; color: #10b981; font-weight: 600; }
 
 /* ── Timeline ── */
-.timeline { padding: 8px 20px; }
-.tl-item  { display: flex; gap: 12px; padding: 10px 0; border-bottom: 1px solid #f5f5f5; }
+.timeline { padding: 6px 16px; }
+.tl-item  { display: flex; gap: 10px; padding: 8px 0; border-bottom: 1px solid #f5f5f5; }
 .tl-item:last-child { border-bottom: none; }
-.tl-icon  { width: 32px; height: 32px; border-radius: 50%; display: flex; align-items: center;
-             justify-content: center; font-size: 14px; flex-shrink: 0; margin-top: 2px; }
+.tl-icon  { width: 26px; height: 26px; border-radius: 50%; display: flex; align-items: center;
+             justify-content: center; font-size: 12px; flex-shrink: 0; margin-top: 2px; }
 .ic-buy    { background: #d1fae5; }
 .ic-sell   { background: #fee2e2; }
 .ic-think  { background: #e0e7ff; }
@@ -141,21 +143,21 @@ main { padding: 20px 24px; max-width: 1200px; margin: 0 auto; display: grid; gap
 .ic-error  { background: #fee2e2; }
 .ic-sl     { background: #fef3c7; }
 .tl-body  { flex: 1; }
-.tl-title { font-weight: 600; font-size: 13px; color: #1a1a2e; }
-.tl-desc  { font-size: 12px; color: #888; margin-top: 2px; line-height: 1.5; }
-.tl-time  { font-size: 11px; color: #ccc; margin-top: 3px; }
+.tl-title { font-weight: 600; font-size: 12px; color: #1a1a2e; }
+.tl-desc  { font-size: 11px; color: #888; margin-top: 1px; line-height: 1.4; }
+.tl-time  { font-size: 10px; color: #ccc; margin-top: 2px; }
 .tl-pnl   { font-weight: 700; }
 
 /* ── Stats ── */
-.stats-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 16px; padding: 16px 20px; }
+.stats-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 12px; padding: 16px 20px; }
 .stat-item { text-align: center; }
 .stat-num  { font-size: 24px; font-weight: 700; }
 .stat-lbl  { font-size: 12px; color: #aaa; margin-top: 4px; }
 
 /* ── Empty ── */
-.empty-state { padding: 40px 20px; text-align: center; color: #ccc; }
-.empty-state .emoji { font-size: 32px; margin-bottom: 8px; }
-.empty-state p { font-size: 14px; }
+.empty-state { padding: 20px; text-align: center; color: #ccc; }
+.empty-state .emoji { font-size: 22px; margin-bottom: 4px; }
+.empty-state p { font-size: 13px; }
 
 /* ── PnL chart ── */
 #pnl-chart-wrap { padding: 16px 20px 8px; }
@@ -169,17 +171,19 @@ main { padding: 20px 24px; max-width: 1200px; margin: 0 auto; display: grid; gap
 .footer-stat b { color: #666; }
 
 /* ── Tabs ── */
-.tab-bar { display: flex; gap: 0; border-bottom: 1px solid #f0f0f0; padding: 0 20px; }
-.tab-btn { padding: 10px 16px; font-size: 13px; font-weight: 500; color: #999; cursor: pointer;
+.tab-bar { display: flex; gap: 0; border-bottom: 1px solid #f0f0f0; padding: 0 16px; }
+.tab-btn { padding: 8px 14px; font-size: 12px; font-weight: 500; color: #999; cursor: pointer;
            border-bottom: 2px solid transparent; margin-bottom: -1px; transition: all .15s; background: none; border-top: none; border-left: none; border-right: none; }
 .tab-btn.active { color: #6366f1; border-bottom-color: #6366f1; }
 .tab-btn:hover  { color: #6366f1; }
 .tab-panel { display: none; }
 .tab-panel.active { display: block; }
 
-@media (max-width: 768px) {
+@media (max-width: 900px) {
   .overview { grid-template-columns: repeat(2, 1fr); }
   main { padding: 12px 16px; }
+  main > div[style*="grid-template-columns"] { display: block !important; }
+  main > div[style*="grid-template-columns"] > .section { margin-bottom: 16px; }
 }
 </style>
 </head>
@@ -191,8 +195,16 @@ main { padding: 20px 24px; max-width: 1200px; margin: 0 auto; display: grid; gap
     <div class="dot dot-off" id="status-dot"></div>
     <span id="status-text">检查中…</span>
   </div>
+  <div id="fastscan-pill" style="display:none; position:relative; align-items:center; gap:4px; padding:4px 10px; border-radius:16px; background:rgba(99,102,241,0.15); border:1px solid rgba(99,102,241,0.3); font-size:12px; color:#a5b4fc; max-width:220px; overflow:visible; white-space:nowrap; cursor:default;"
+       onmouseenter="document.getElementById('fastscan-tooltip').style.display='block'"
+       onmouseleave="document.getElementById('fastscan-tooltip').style.display='none'">
+    <span>⚡</span><span id="fastscan-text">快扫</span>
+    <div id="fastscan-tooltip" style="display:none; position:absolute; top:calc(100% + 6px); left:0; z-index:99;
+         background:#1e293b; color:#e2e8f0; font-size:12px; border-radius:8px; padding:8px 12px;
+         min-width:180px; max-width:280px; white-space:normal; line-height:1.6;
+         box-shadow:0 4px 12px rgba(0,0,0,.3); pointer-events:none;"></div>
+  </div>
   <div class="header-actions">
-    <span id="next-run"></span>
     <button class="btn btn-action" onclick="triggerCollect()">立即扫描</button>
     <button class="btn btn-action" onclick="triggerCycle()">立即决策</button>
     <button class="btn btn-start" onclick="botAction('start')">启动</button>
@@ -200,54 +212,99 @@ main { padding: 20px 24px; max-width: 1200px; margin: 0 auto; display: grid; gap
   </div>
 </header>
 
+<div id="square-banner" style="display:none; background:#451a03; color:#fed7aa; padding:10px 24px; font-size:13px; border-bottom:1px solid #92400e;">
+  ⚠️ <span id="square-banner-text"></span>
+  <a href="https://www.binance.com/zh-CN/square/home" target="_blank"
+     style="color:#fbbf24; margin-left:8px; text-decoration:underline;">打开币安广场</a>
+  <span style="color:#92400e; margin-left:6px; font-size:12px">→ F12 → Network → 复制 Cookie → 粘贴到 config/square_cookie.txt</span>
+</div>
+
 <main>
 
-  <!-- Overview -->
-  <div class="overview">
-    <div class="ov-card">
-      <div class="ov-label">当前持仓</div>
-      <div class="ov-value blue" id="ov-count">-</div>
-      <div class="ov-sub" id="ov-count-sub">最多同时持有3个</div>
-    </div>
-    <div class="ov-card">
-      <div class="ov-label">持仓浮动盈亏</div>
-      <div class="ov-value" id="ov-upnl">-</div>
-      <div class="ov-sub" id="ov-upnl-sub">尚未锁定</div>
-    </div>
-    <div class="ov-card">
-      <div class="ov-label">今日已赚 / 已亏</div>
-      <div class="ov-value" id="ov-rpnl">-</div>
-      <div class="ov-sub" id="ov-rpnl-sub">已结算</div>
-    </div>
-    <div class="ov-card">
-      <div class="ov-label">正在观察的币</div>
-      <div class="ov-value blue" id="ov-cands">-</div>
-      <div class="ov-sub" id="ov-cands-age">机器人候选列表</div>
-    </div>
-  </div>
+  <!-- Two-column master layout: left=content, right=activity -->
+  <div style="display:grid; grid-template-columns: 3fr 2fr; gap: 12px; align-items: stretch;">
 
-  <!-- Positions -->
-  <div class="section">
-    <div class="section-header">
-      <div class="section-title">📊 当前持仓</div>
-    </div>
-    <div id="positions-area"></div>
-  </div>
+    <!-- LEFT column -->
+    <div style="display:flex; flex-direction:column; gap:12px;">
 
-  <!-- Watchlist + Activity -->
-  <div style="display:grid; grid-template-columns: 1fr 1fr; gap: 16px;">
-
-    <!-- Watchlist -->
-    <div class="section">
-      <div class="section-header">
-        <div class="section-title">🔍 机器人正在关注</div>
-        <div class="section-meta" id="watchlist-age"></div>
+      <!-- Overview card -->
+      <div class="overview-card">
+        <div class="overview-grid">
+          <div class="ov-card">
+            <div class="ov-label">当前持仓</div>
+            <div class="ov-value blue" id="ov-count">-</div>
+            <div class="ov-sub" id="ov-count-sub">最多同时持有3个</div>
+          </div>
+          <div class="ov-card">
+            <div class="ov-label">持仓浮动盈亏</div>
+            <div class="ov-value" id="ov-upnl">-</div>
+            <div class="ov-sub" id="ov-upnl-sub">尚未锁定</div>
+          </div>
+          <div class="ov-card">
+            <div class="ov-label">今日已赚 / 已亏</div>
+            <div class="ov-value" id="ov-rpnl">-</div>
+            <div class="ov-sub" id="ov-rpnl-sub">已结算</div>
+          </div>
+          <div class="ov-card">
+            <div class="ov-label">正在观察的币</div>
+            <div class="ov-value blue" id="ov-cands">-</div>
+            <div class="ov-sub" id="ov-cands-age">机器人候选列表</div>
+          </div>
+        </div>
       </div>
-      <div id="watchlist-area"><div class="empty-state"><p>加载中…</p></div></div>
+
+      <!-- Positions -->
+      <div class="section">
+        <div class="section-header">
+          <div class="section-title">📊 当前持仓</div>
+        </div>
+        <div id="positions-area"></div>
+      </div>
+
+      <!-- Watchlist -->
+      <div class="section">
+        <div class="section-header">
+          <div class="section-title">🔍 机器人正在关注</div>
+          <div class="section-meta" id="watchlist-age"></div>
+        </div>
+        <div id="watchlist-area"><div class="empty-state"><p>加载中…</p></div></div>
+      </div>
+
+      <!-- PnL chart + Exit stats row -->
+      <div style="display:grid; grid-template-columns: 3fr 2fr; gap:12px; align-items:stretch;">
+        <div class="section" style="display:flex; flex-direction:column;">
+          <div class="section-header">
+            <div class="section-title">📈 累计盈亏曲线</div>
+            <div class="section-meta" id="pnl-total-label"></div>
+          </div>
+          <div id="pnl-chart-wrap" style="flex:1;"><canvas id="pnl-canvas" height="100"></canvas></div>
+          <div class="footer-bar" id="pnl-footer"></div>
+        </div>
+        <div class="section" style="display:flex; flex-direction:column;">
+          <div class="section-header">
+            <div class="section-title">📊 出场方式统计</div>
+          </div>
+          <div class="stats-grid" id="exit-stats-area" style="flex:1;">
+            <div class="empty-state" style="grid-column:1/-1"><p>加载中…</p></div>
+          </div>
+          <div class="footer-bar" id="exit-stats-footer"></div>
+        </div>
+      </div>
+
+      <!-- Log viewer -->
+      <div class="section">
+        <div class="section-header">
+          <div class="section-title">🖥 运行日志</div>
+          <div class="section-meta" id="log-meta">实时</div>
+        </div>
+        <div id="log-area" style="font-family:monospace; font-size:11px; color:#555; background:#f8f9fa;
+             padding:10px 14px;  overflow-y:auto; line-height:1.6; white-space:pre-wrap;"></div>
+      </div>
+
     </div>
 
-    <!-- Activity -->
-    <div class="section">
+    <!-- RIGHT column: Activity -->
+    <div class="section" style="display:flex; flex-direction:column; align-self:stretch;">
       <div class="section-header">
         <div class="section-title">📋 最近发生了什么</div>
       </div>
@@ -256,28 +313,9 @@ main { padding: 20px 24px; max-width: 1200px; margin: 0 auto; display: grid; gap
         <button class="tab-btn" onclick="switchTab('trade')">交易</button>
         <button class="tab-btn" onclick="switchTab('skip')">无操作</button>
       </div>
-      <div id="activity-area"><div class="empty-state"><p>加载中…</p></div></div>
+      <div id="activity-area" style="flex:1; min-height:0; overflow-y:auto;"><div class="empty-state"><p>加载中…</p></div></div>
     </div>
-  </div>
 
-  <!-- PnL History -->
-  <div class="section">
-    <div class="section-header">
-      <div class="section-title">📈 累计盈亏曲线</div>
-      <div class="section-meta" id="pnl-total-label"></div>
-    </div>
-    <div id="pnl-chart-wrap"><canvas id="pnl-canvas" height="100"></canvas></div>
-    <div class="footer-bar" id="pnl-footer"></div>
-  </div>
-
-  <!-- Stats -->
-  <div class="section">
-    <div class="section-header">
-      <div class="section-title">📊 出场方式统计</div>
-    </div>
-    <div class="stats-grid" id="exit-stats-area">
-      <div class="empty-state" style="grid-column:1/-1"><p>加载中…</p></div>
-    </div>
   </div>
 
 </main>
@@ -332,9 +370,13 @@ function switchTab(t) {
 
 /* ─── countdown ─── */
 let nextRefreshTs = Date.now() + 30000;
+let botRunning = false;
 setInterval(() => {
   const s = Math.max(0, Math.ceil((nextRefreshTs - Date.now()) / 1000));
-  document.getElementById('next-run').textContent = s > 0 ? `${s}s 后刷新` : '刷新中…';
+  const txt = document.getElementById('status-text');
+  if (botRunning) {
+    txt.textContent = s > 0 ? `运行中 — ${s}s 后刷新` : '刷新中…';
+  }
 }, 1000);
 
 /* ─── status ─── */
@@ -343,10 +385,10 @@ async function loadStatus() {
   const pill = document.getElementById('status-pill');
   const dot  = document.getElementById('status-dot');
   const txt  = document.getElementById('status-text');
+  botRunning = r.running;
   if (r.running) {
     pill.className = 'status-pill status-on';
     dot.className = 'dot dot-on';
-    txt.textContent = '运行中 — 每30分钟自动分析一次';
   } else {
     pill.className = 'status-pill status-off';
     dot.className = 'dot dot-off';
@@ -448,7 +490,7 @@ async function loadWatchlist() {
   if (data.generated_at_ms) {
     const age = Date.now() - data.generated_at_ms;
     ageEl.textContent = fmtAge(data.generated_at_ms) + '更新';
-    ageEl.className = age > 600000 ? 'section-meta stale-text' : 'section-meta';
+    ageEl.className = age > 1200000 ? 'section-meta stale-text' : 'section-meta';
     document.getElementById('ov-cands-age').textContent = fmtAge(data.generated_at_ms) + '更新';
   }
 
@@ -536,7 +578,7 @@ function renderActivity() {
     } else if (e.event === 'exit_triggered') {
       icon = '🎯'; iconCls = 'ic-sell';
       title = `自动出场 — ${coin}`;
-      desc  = (e.reason || '').slice(0, 80);
+      desc  = escHtml((e.reason || '').slice(0, 80));
     } else if (e.event === 'decision') {
       const opens  = (e.open  || []).map(o => o.symbol.replace('USDT', '')).join('、');
       const closes = (e.close || []).map(c => c.symbol.replace('USDT', '')).join('、');
@@ -556,7 +598,7 @@ function renderActivity() {
     } else if (e.event === 'error') {
       icon = '⚠️'; iconCls = 'ic-error';
       title = '出现了一个错误';
-      desc  = (e.error || e.message || '').slice(0, 80);
+      desc  = escHtml((e.error || e.message || '').slice(0, 80));
     } else {
       return '';
     }
@@ -572,13 +614,18 @@ function renderActivity() {
   }).filter(Boolean).join('')}</div>`;
 }
 
+function escHtml(s) {
+  return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+}
 function simplifySkipReason(reason) {
   if (reason.includes('older than 10 minutes')) return '市场数据过期，等待下次扫描';
   if (reason.includes('cap_reached'))           return '已达到最大持仓数量（3个）';
   if (reason.includes('daily_loss'))            return '今日亏损已达上限，暂停开仓';
   if (reason.includes('cooldown'))              return '止损冷却中，暂停开仓';
   if (reason.includes('no candidate'))          return '没有找到符合条件的币种';
-  return reason.slice(0, 80);
+  if (reason.includes('candidates passed') || reason.includes('qualified') || reason.includes('filtered at stage') || reason.includes('low-gain') || reason.includes('low-volume')) return '没有币种通过筛选条件';
+  if (reason.includes('sector_exposure_cap'))   return '行业集中度超限，暂不开仓';
+  return escHtml(reason.slice(0, 80));
 }
 
 /* ─── PnL chart ─── */
@@ -675,6 +722,22 @@ async function loadExitStats() {
       <div style="font-size:12px; color:#aaa; margin-top:4px">占比 ${pct}%</div>
     </div>`;
   }).join('');
+  document.getElementById('exit-stats-footer').innerHTML =
+    `<span class="footer-stat">共平仓 <b>${total}</b> 次</span>`;
+}
+
+/* ─── log viewer ─── */
+function loadLogs() {
+  const area = document.getElementById('log-area');
+  const es = new EventSource('/stream/logs');
+  es.onmessage = e => {
+    area.textContent += e.data + '\n';
+    area.scrollTop = area.scrollHeight;
+  };
+  es.onerror = () => {
+    document.getElementById('log-meta').textContent = '连接断开';
+    es.close();
+  };
 }
 
 /* ─── actions ─── */
@@ -684,11 +747,20 @@ async function botAction(action) {
   await loadStatus();
 }
 async function triggerCollect() {
+  const btn = event.target;
+  btn.textContent = '扫描中…'; btn.disabled = true;
   await fetch('/api/bot/collect', {method:'POST'});
-  setTimeout(loadWatchlist, 3000);
+  let secs = 15;
+  const iv = setInterval(() => { btn.textContent = `扫描中… ${--secs}s`; }, 1000);
+  setTimeout(() => { clearInterval(iv); btn.textContent = '立即扫描'; btn.disabled = false; loadWatchlist(); loadActivity(); }, 15000);
 }
 async function triggerCycle() {
+  const btn = event.target;
+  btn.textContent = '决策中…'; btn.disabled = true;
   await fetch('/api/bot/cycle', {method:'POST'});
+  let secs = 30;
+  const iv = setInterval(() => { btn.textContent = `决策中… ${--secs}s`; }, 1000);
+  setTimeout(() => { clearInterval(iv); btn.textContent = '立即决策'; btn.disabled = false; loadAll(); }, 30000);
 }
 async function closePosition(symbol) {
   const coin = symbol.replace('USDT', '');
@@ -701,14 +773,74 @@ async function closePosition(symbol) {
   else await loadPositions();
 }
 
+/* ─── fast scan status ─── */
+async function loadFastScan() {
+  const s = await fetch('/api/fast-scan').then(r => r.json());
+  const pill = document.getElementById('fastscan-pill');
+  const text = document.getElementById('fastscan-text');
+  const tip  = document.getElementById('fastscan-tooltip');
+  if (!s.enabled) { pill.style.display = 'none'; return; }
+  pill.style.display = 'flex';
+  const surgeCount = s.surge_count || 0;
+  const surgeSyms  = (s.last_surge_symbols || []).map(sym => sym.replace('USDT',''));
+  const newSigs    = (s.new_signals || []).map(sym => sym.replace('USDT',''));
+  const ago = s.last_scan_ts ? fmtAge(s.last_scan_ts * 1000) : '未运行';
+
+  if (s.last_trigger_ts && (Date.now()/1000 - s.last_trigger_ts) < 300) {
+    pill.style.background = 'rgba(251,191,36,0.15)';
+    pill.style.borderColor = 'rgba(251,191,36,0.4)';
+    pill.style.color = '#fbbf24';
+    text.textContent = `触发决策 · ${newSigs.length}个新信号`;
+    tip.innerHTML = [
+      `<b>触发了完整决策周期</b>`,
+      newSigs.length ? `🆕 新信号：${newSigs.join('、')}` : '',
+      surgeSyms.length ? `⚡ 全部异动（${surgeSyms.length}）：${surgeSyms.join('、')}` : '',
+      `🕐 ${ago}扫描`,
+    ].filter(Boolean).join('<br>');
+  } else if (surgeCount > 0) {
+    pill.style.background = 'rgba(99,102,241,0.15)';
+    pill.style.borderColor = 'rgba(99,102,241,0.3)';
+    pill.style.color = '#a5b4fc';
+    text.textContent = `快扫 · ${surgeCount}个异动`;
+    tip.innerHTML = [
+      `<b>检测到 ${surgeCount} 个异动币</b>`,
+      surgeSyms.join('、') || '—',
+      `<span style="color:#94a3b8">🕐 ${ago}扫描</span>`,
+    ].join('<br>');
+  } else {
+    pill.style.background = 'rgba(99,102,241,0.15)';
+    pill.style.borderColor = 'rgba(99,102,241,0.3)';
+    pill.style.color = '#a5b4fc';
+    text.textContent = `快扫 · 无异动`;
+    tip.innerHTML = `<span style="color:#94a3b8">暂无异动币种<br>🕐 ${ago}扫描</span>`;
+  }
+}
+
+/* ─── square status ─── */
+async function loadSquareStatus() {
+  const s = await fetch('/api/square-status').then(r => r.json());
+  const banner = document.getElementById('square-banner');
+  const text   = document.getElementById('square-banner-text');
+  if (!s.cookie_set) {
+    banner.style.display = 'block';
+    text.textContent = '币安广场 Cookie 未配置，社区热度信号已禁用。';
+  } else if (s.source === 'fallback' || s.source === 'none') {
+    banner.style.display = 'block';
+    text.textContent = 'Cookie 可能已失效，广场爬虫返回空数据（使用涨幅榜兜底）。需要重新获取 Cookie：';
+  } else {
+    banner.style.display = 'none';
+  }
+}
+
 /* ─── main ─── */
 async function loadAll() {
-  await Promise.all([loadStatus(), loadPositions(), loadPnlChart(), loadExitStats()]);
-  await Promise.all([loadWatchlist(), loadActivity()]);
+  await Promise.allSettled([loadStatus(), loadPositions(), loadPnlChart(), loadExitStats(), loadSquareStatus(), loadFastScan()]);
+  await Promise.allSettled([loadWatchlist(), loadActivity()]);
   nextRefreshTs = Date.now() + 30000;
 }
 
 loadAll();
+loadLogs();
 setInterval(loadAll, 30000);
 </script>
 </body>

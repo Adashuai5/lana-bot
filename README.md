@@ -24,10 +24,14 @@ cd /Users/ada/lana-bot
 uv sync
 ```
 
-### 第二步：启动机器人（每 30 分钟自动运行）
+### 第二步：启动机器人
 
 ```bash
+# 主决策循环（每 30 分钟）
 launchctl load ~/Library/LaunchAgents/com.lanabot.cycle.plist
+
+# 快速扫描（每 5 分钟）— 发现异动自动触发完整决策
+launchctl load ~/Library/LaunchAgents/com.lanabot.fastscan.plist
 ```
 
 ### 第三步：打开网页面板
@@ -46,6 +50,7 @@ uv run python scripts/dashboard.py
 
 ```bash
 launchctl unload ~/Library/LaunchAgents/com.lanabot.cycle.plist
+launchctl unload ~/Library/LaunchAgents/com.lanabot.fastscan.plist
 ```
 
 ---
@@ -68,6 +73,10 @@ claude -p "@CLAUDE.md run one decision cycle"
 1. **扫描市场** — 看哪些小币最近涨得猛、且有真实资金在流入
 2. **AI 判断** — Claude 分析，决定买哪个、卖哪个，或者什么都不做
 3. **模拟下单** — 记录买卖，不动真钱
+
+**两速机制：**
+- **快扫**（每5分钟）：纯Python扫描，发现异动（涨幅>15%+成交量>2000万U）立即触发完整决策，不消耗Claude额度
+- **完整决策**（每30分钟）：Claude分析全部信号，触发后30分钟内不重复触发
 
 **买入条件（做多）：** 24 小时涨幅超 10%，且资金持续流入（不是虚假拉盘）
 
@@ -118,7 +127,8 @@ proxy = "socks5://127.0.0.1:7890"  # ClashX 代理，用于访问币安
 | 市场扫描 | ✅ 正常 |
 | AI 决策（Claude） | ✅ 正常 |
 | 模拟交易 | ✅ 正常 |
-| 止损保护 | ✅ 正常 |
+| 止损保护 | ✅ 正常（风控链路 v2：直接函数调用，不解析日志） |
+| AI 决策硬约束层 | ✅ 正常（仓位上限 / 日亏上限在执行前强制过滤） |
 | 网页面板 | ✅ 正常 |
 | Binance 实盘交易 | ✅ 就绪（待开启） |
 | 实盘模式 | ⏸️ 关闭（`live_trading = false`） |
@@ -142,10 +152,29 @@ live_trading = true
 ## 目录结构（了解即可）
 
 ```
-config/          # 配置文件
-scripts/         # 核心脚本（collect / execute / monitor / dashboard）
-src/lana_bot/    # 主程序代码
-data/            # 运行数据（持仓、决策、日志）
-logs/            # 运行日志
-templates/       # 网页面板
+config/                    # 配置文件
+scripts/
+  collect.py               # 市场数据收集（每 30 分钟）
+  execute.py               # 执行 AI 决策（含硬约束过滤层）
+  monitor.py               # 风险守护进程（每 10 秒轮询）
+  fast_scan.py             # 快速异动扫描（每 5 分钟）
+  dashboard.py             # 网页面板服务
+src/lana_bot/
+  risk/
+    exit_engine.py         # 退出引擎：止损 / 止盈 / 超时（集中）
+    risk_engine.py         # 风控统一入口：直接状态，不解析日志
+    circuit_breaker.py     # 断路器：日亏上限 / 冷却期等
+    exit_rules.py          # 出场规则参数与判断逻辑
+    stop_loss.py           # 未实现 PnL 计算
+  execution/               # 交易所客户端（实盘 / 模拟）
+  state/                   # 持仓与日志
+  data/                    # 市场数据 / 候选排序
+data/
+  positions.json           # 当前持仓（唯一状态源）
+  risk_state.json          # 风控直接状态（止损时间戳等）
+  journal.ndjson           # 事件日志（只写，不作为风控触发源）
+  candidates/              # 候选币列表
+  decisions/               # AI 决策文件
+logs/                      # 运行日志
+templates/                 # 网页面板
 ```

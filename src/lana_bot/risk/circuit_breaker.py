@@ -15,6 +15,7 @@ from lana_bot.risk.stop_loss import unrealized_pnl_usdt
 from lana_bot.state import positions
 
 JOURNAL_FILE = DATA_DIR / "journal.ndjson"
+RISK_STATE_FILE = DATA_DIR / "risk_state.json"
 DAY_MS = 24 * 60 * 60 * 1000
 
 # Common meme clusters for correlation/crowding control.
@@ -46,6 +47,17 @@ class BreakerDecision:
 
 def _deny(dimension: str, reason: str, **details) -> BreakerDecision:
     return BreakerDecision(False, reason=reason, dimension=dimension, details=details)
+
+
+def _direct_stop_loss_ts_ms() -> int | None:
+    """Read stop-loss timestamp from risk_state.json (written directly, no log parsing)."""
+    if not RISK_STATE_FILE.exists():
+        return None
+    try:
+        v = json.loads(RISK_STATE_FILE.read_text()).get("last_stop_loss_ts_ms", 0)
+        return v or None
+    except Exception:  # noqa: BLE001
+        return None
 
 
 def _iter_recent_events(window_ms: int) -> list[dict]:
@@ -204,7 +216,7 @@ def check_can_open(
             )
 
     if cooldown_min > 0:
-        last_sl = recent_stop_loss_ts_ms(events_24h)
+        last_sl = _direct_stop_loss_ts_ms() or recent_stop_loss_ts_ms(events_24h)
         if last_sl is not None:
             elapsed_min = (int(time.time() * 1000) - last_sl) / 60_000
             if elapsed_min < cooldown_min:

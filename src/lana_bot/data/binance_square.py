@@ -21,7 +21,8 @@ from loguru import logger
 
 from lana_bot.config import DATA_DIR
 
-SQUARE_URL = "https://www.binance.com/en/square/home"
+SQUARE_URL = "https://www.binance.com/zh-CN/square/home"
+LANAAI_URL = "https://www.binance.com/zh-CN/square/profile/lanaai"
 
 _CASHTAG_RE = re.compile(r"\$([A-Z][A-Z0-9]{1,9})\b")
 _STOPWORDS = {"USD", "USDT", "USDC", "BUSD", "FDUSD", "DAI", "TUSD"}
@@ -72,9 +73,21 @@ def _read_cache() -> dict[str, int] | None:
     return None
 
 
-def _write_cache(mentions: dict[str, int]) -> None:
+def _write_cache(mentions: dict[str, int], source: str = "square") -> None:
     _CACHE_FILE.parent.mkdir(parents=True, exist_ok=True)
-    _CACHE_FILE.write_text(json.dumps({"ts": time.time(), "mentions": mentions}))
+    _CACHE_FILE.write_text(json.dumps({"ts": time.time(), "mentions": mentions, "source": source}))
+
+
+def get_square_status() -> dict:
+    """Return cookie/scrape status for dashboard display."""
+    cookie_ok = bool(_load_cookie())
+    if not _CACHE_FILE.exists():
+        return {"cookie_set": cookie_ok, "source": "none", "ts": None}
+    try:
+        data = json.loads(_CACHE_FILE.read_text())
+        return {"cookie_set": cookie_ok, "source": data.get("source", "unknown"), "ts": data.get("ts")}
+    except Exception:  # noqa: BLE001
+        return {"cookie_set": cookie_ok, "source": "error", "ts": None}
 
 
 def _fallback_from_gainers() -> dict[str, int]:
@@ -105,10 +118,23 @@ def fetch_square_mentions() -> dict[str, int]:
     if not result:
         logger.warning("square scrape empty/failed — using top-gainers fallback")
         result = _fallback_from_gainers()
-
-    if result:
-        _write_cache(result)
+        if result:
+            _write_cache(result, source="fallback")
+    else:
+        _write_cache(result, source="square")
     return result
+
+
+def _load_cookie() -> str:
+    # Prefer plain-text file (avoids TOML quoting issues with JSON in cookie)
+    try:
+        from lana_bot.config import ROOT
+        cookie_file = ROOT / "config" / "square_cookie.txt"
+        if cookie_file.exists():
+            return cookie_file.read_text().strip()
+    except Exception:  # noqa: BLE001
+        pass
+    return ""
 
 
 def _scrape() -> dict[str, int]:
@@ -120,6 +146,7 @@ def _scrape() -> dict[str, int]:
 
     ua = random.choice(_USER_AGENTS)
     logger.debug("square scrape UA: {}", ua[:60])
+    cookie_str = _load_cookie()
 
     try:
         with sync_playwright() as p:
@@ -130,17 +157,28 @@ def _scrape() -> dict[str, int]:
                     viewport={"width": 1280, "height": 900},
                 )
                 page = context.new_page()
-                page.set_extra_http_headers({
+                headers: dict[str, str] = {
                     "Referer": "https://www.binance.com/",
-                    "Accept-Language": "en-US,en;q=0.9",
-                })
-                page.goto(SQUARE_URL, timeout=_NAV_TIMEOUT_MS, wait_until="domcontentloaded")
-                page.wait_for_timeout(_RENDER_SETTLE_MS)
-                # Two scrolls instead of three — reduces lazy-load trigger risk.
-                for _ in range(2):
-                    page.mouse.wheel(0, 3000)
-                    page.wait_for_timeout(_SCROLL_SETTLE_MS)
-                body_text = page.inner_text("body")
+                    "Accept-Language": "zh-CN,zh;q=0.9,en;q=0.8",
+                }
+                if cookie_str:
+                    headers["Cookie"] = cookie_str
+                page.set_extra_http_headers(headers)
+                def _fetch_page(url: str) -> str:
+                    page.goto(url, timeout=_NAV_TIMEOUT_MS, wait_until="domcontentloaded")
+                    page.wait_for_timeout(_RENDER_SETTLE_MS)
+                    for _ in range(2):
+                        page.mouse.wheel(0, 3000)
+                        page.wait_for_timeout(_SCROLL_SETTLE_MS)
+                    return page.inner_text("body")
+
+                body_text = _fetch_page(SQUARE_URL)
+                # Also scrape lanaai profile (reference bot account)
+                try:
+                    body_text += "\n" + _fetch_page(LANAAI_URL)
+                    logger.debug("lanaai profile fetched")
+                except Exception:  # noqa: BLE001
+                    pass
             finally:
                 browser.close()
     except Exception as e:  # noqa: BLE001

@@ -12,7 +12,7 @@ decision file, invoke the executor, then stop.
   Square mention counts, all pre-ranked into a candidate list for you.
 - Per position: 10x leverage, 20U collateral → 200U notional, hard stop loss at
   unrealized PnL ≤ -10U（由 Python daemon 执行；PnL 按名义价值计算）。
-- Max 3 concurrent positions.
+- Max 2 concurrent positions (50U capital; 2 × 20U margin = 40U, keeps 10U buffer).
 - **Phase 1 (now): dry-run only** — `live_trading=false` in
   `config/strategy.toml`. You can be bolder for learning purposes, but the
   bar to open should still be real.
