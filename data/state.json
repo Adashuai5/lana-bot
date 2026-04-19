@@ -1,5 +1,5 @@
 {
-  "_version": 5,
+  "_version": 6,
   "risk": {
     "last_stop_loss_ts_ms": 1776575127805,
     "stop_loss_log": [
@@ -17,6 +17,9 @@
     },
     "processed_closes": {
       "test-pos-001": 1776575127.807584
+    },
+    "executed_actions": {
+      "1083a28d55d4": 1776590633.714547
     }
   },
   "scores": {

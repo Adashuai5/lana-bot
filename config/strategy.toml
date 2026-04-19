@@ -4,13 +4,20 @@
 live_trading = false            # MUST stay false until dry-run validation passes
 exchange = "binance"            # "binance" | "gate"
 initial_capital_usdt = 50
-# Stop-loss口径（唯一定义）：按"未实现PnL(USDT)"触发，PnL基于名义价值(notional)计算。
-# 触发条件：unrealized_pnl_usdt <= -max_stop_loss_per_position_usdt
-# 示例：position_size_usdt=20, leverage=10 -> notional=200U；若 max_stop_loss_per_position_usdt=10，
-# 则等价于保证金亏损50%（10/20）或名义价值回撤5%（10/200）。
-max_stop_loss_per_position_usdt = 10
-max_concurrent_positions = 2
-position_size_usdt = 20         # collateral per position (notional = 20 * leverage)
+# 仓位大小与止损均为百分比逻辑，每个 cycle 从当前净值动态派生。
+# 净值 = initial_capital_usdt + journal 中所有 close 事件的 net_pnl_usdt 之和（仅已实现）。
+# 止损口径：按"未实现PnL(USDT)"触发，PnL基于名义价值(notional)计算。
+# 示例（50U净值时）：position_size = 50 × 40% = 20U；stop = 20 × 50% = 10U；notional = 200U。
+
+# 仓位大小：equity × position_size_pct（下限 position_size_min_usdt，上限 position_size_max_usdt）
+position_size_pct = 0.40
+position_size_min_usdt = 5.0
+position_size_max_usdt = 200.0
+
+# 单仓止损：position_size_usdt × max_stop_loss_pct_of_position
+max_stop_loss_pct_of_position = 0.50
+
+max_concurrent_positions = 10
 leverage = 10
 cycle_minutes = 30
 
@@ -42,21 +49,26 @@ top_n = 5
 [risk]
 # Account-level circuit breakers. Evaluated pre-open in execute.py.
 # Set any to 0 to disable that gate.
-max_daily_loss_usdt = 30        # halt opens once 24h realized PnL ≤ -30U (~30% of capital)
-max_unrealized_drawdown_usdt = 20 # halt opens once combined unrealized PnL ≤ -20U
-max_sector_exposure_pct = 0      # disabled: 200U notional vs 50U capital always triggers; stop-loss is the real guard
-max_daily_opens = 12            # cap opens per 24h (~cycle cadence * 3 candidates)
-stop_loss_cooldown_min = 0      # account-level SL cooldown (disabled; per-symbol below)
-max_daily_sl_per_symbol = 2     # per-symbol: ≥ N SLs today → block all-day
-symbol_sl_cooldown_min = 90     # per-symbol: cooldown minutes after any SL
-atr_stop_multiplier = 1.5       # stop = 1.5 × ATR × notional; set to 0 to use fixed stop only
-atr_stop_min_usdt = 8           # floor: never tighter than 8U (40% of 20U margin)
-atr_stop_max_usdt = 14          # ceiling: never wider than 14U (70% of 20U margin)
+# 日亏上限和未实现回撤上限：均为当前净值的百分比，随净值自动缩放。
+# 50U净值时：max_daily_loss = 50 × 60% = 30U；max_unrealized_drawdown = 50 × 40% = 20U（与旧值一致）。
+max_daily_loss_pct = 0.60
+max_unrealized_drawdown_pct = 0.40
+max_sector_exposure_pct = 0      # 禁用：200U notional vs 50U capital 始终触发，真实保护来自止损
+max_daily_opens = 12            # 24h 最多开仓次数
+stop_loss_cooldown_min = 0      # 账户级SL冷却（禁用；单symbol级别见下方）
+max_daily_sl_per_symbol = 2     # 单symbol：今日SL ≥ N 次 → 全天封禁
+symbol_sl_cooldown_min = 90     # 单symbol：任意SL后冷却分钟数
+atr_stop_multiplier = 1.5       # stop = 1.5 × ATR × notional；设为0则仅用固定止损
+# ATR止损范围：相对于 position_size_usdt 的比例（50U净值时：8U-14U，与旧值一致）
+atr_stop_min_pct_of_position = 0.40
+atr_stop_max_pct_of_position = 0.70
 
 [exit_rules]
 risk_multiple_tp = 1.5
 risk_multiple_tp_close_fraction = 0.5
-trailing_drawdown_usdt = 3
+# trailing_drawdown：触发止盈后，剩余仓位回撤超过此值则强制平仓。
+# 相对于 position_size_usdt 的比例（50U净值时：20U × 15% = 3U，与旧值一致）。
+trailing_drawdown_pct = 0.15
 max_hold_seconds = 21600
 
 [regime]

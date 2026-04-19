@@ -15,6 +15,7 @@ from loguru import logger
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))
 
 from lana_bot.config import DATA_DIR, LOGS_DIR, strategy  # noqa: E402
+from lana_bot.equity import derive_sizing  # noqa: E402
 from lana_bot.data.market_regime import decide_regime_gate  # noqa: E402
 from lana_bot.execution import get_client  # noqa: E402
 from lana_bot.risk.circuit_breaker import DAY_MS, _iter_recent_events, daily_realized_pnl_usdt  # noqa: E402
@@ -45,14 +46,18 @@ def _check_and_record_action(action_id: str) -> bool:
     return False
 
 
-def _atr_stop(symbol: str, size_usdt: float, leverage: int, cfg: dict) -> float | None:
+def _atr_stop(symbol: str, size_usdt: float, leverage: int, cfg: dict, sizing: dict | None = None) -> float | None:
     """Compute ATR-based stop for this open. Returns None to fall back to config default."""
     risk = cfg.get("risk", {})
     multiplier = float(risk.get("atr_stop_multiplier", 0) or 0)
     if multiplier <= 0:
         return None
-    min_stop = float(risk.get("atr_stop_min_usdt", 0) or 0)
-    max_stop = float(risk.get("atr_stop_max_usdt", 0) or 0)
+    if sizing:
+        min_stop = sizing["atr_stop_min_usdt"]
+        max_stop = sizing["atr_stop_max_usdt"]
+    else:
+        min_stop = float(risk.get("atr_stop_min_usdt", 0) or 0)
+        max_stop = float(risk.get("atr_stop_max_usdt", 0) or 0)
     try:
         latest = DATA_DIR / "candidates" / "latest.json"
         payload = json.loads(latest.read_text())
@@ -72,7 +77,7 @@ def _atr_stop(symbol: str, size_usdt: float, leverage: int, cfg: dict) -> float 
     return round(stop, 4)
 
 
-def _constraint_check(item: dict, cfg: dict, current: int) -> str | None:
+def _constraint_check(item: dict, cfg: dict, current: int, sizing: dict | None = None) -> str | None:
     """Hard constraint filter on AI decisions. Returns rejection reason or None if allowed.
 
     Runs before circuit_breaker — AI suggestions are rejected here on hard rule violations.
@@ -80,8 +85,11 @@ def _constraint_check(item: dict, cfg: dict, current: int) -> str | None:
     cap = int(cfg["max_concurrent_positions"])
     if current >= cap:
         return f"cap_reached: {current}/{cap}"
-    risk = cfg.get("risk", {})
-    daily_loss_limit = float(risk.get("max_daily_loss_usdt", 0) or 0)
+    if sizing:
+        daily_loss_limit = sizing["max_daily_loss_usdt"]
+    else:
+        risk = cfg.get("risk", {})
+        daily_loss_limit = float(risk.get("max_daily_loss_usdt", 0) or 0)
     if daily_loss_limit > 0:
         realized = daily_realized_pnl_usdt(_iter_recent_events(DAY_MS))
         if realized <= -daily_loss_limit:
@@ -169,6 +177,12 @@ def main(decision_path: Path) -> int:
     logger.remove()
     logger.add(LOGS_DIR / "execute.log", rotation="10 MB", retention="14 days")
     cfg = strategy()
+    sizing = derive_sizing(cfg)
+    logger.info(
+        "equity_sizing: equity={:.2f}U pos={:.2f}U sl={:.2f}U daily_cap={:.2f}U",
+        sizing["equity_usdt"], sizing["position_size_usdt"],
+        sizing["max_stop_loss_per_position_usdt"], sizing["max_daily_loss_usdt"],
+    )
     client = get_client()
     logger.warning(
         "[安全告警] 即将执行交易流程 exchange={} live_trading={} client={}",
@@ -240,19 +254,29 @@ def main(decision_path: Path) -> int:
             continue
 
         # Hard constraint filter — AI suggestion rejected before circuit_breaker
-        rejection = _constraint_check(item, cfg, current)
+        rejection = _constraint_check(item, cfg, current, sizing=sizing)
         if rejection:
             logger.warning("constraint filter rejected {}: {}", symbol, rejection)
             journal.log("skip", {"reason": rejection, "symbol": symbol, "layer": "constraint_filter"})
             break
 
-        size = item["size_usdt"] if item.get("size_usdt") else cfg["position_size_usdt"]
+        size = item["size_usdt"] if item.get("size_usdt") else sizing["position_size_usdt"]
         if gate and gate.state == "reduce":
             size = round(float(size) * gate.size_multiplier, 8)
         leverage = item["leverage"] if item.get("leverage") else cfg["leverage"]
 
+        # Inject dynamic limits into cfg copy so circuit_breaker uses equity-scaled thresholds
+        cfg_dyn = {
+            **cfg,
+            "risk": {
+                **cfg.get("risk", {}),
+                "max_daily_loss_usdt": sizing["max_daily_loss_usdt"],
+                "max_unrealized_drawdown_usdt": sizing["max_unrealized_drawdown_usdt"],
+            },
+            "max_stop_loss_per_position_usdt": sizing["max_stop_loss_per_position_usdt"],
+        }
         breaker = _risk_can_open(
-            cfg,
+            cfg_dyn,
             pending_symbol=symbol,
             pending_size_usdt=size,
             pending_leverage=leverage,
@@ -271,7 +295,7 @@ def main(decision_path: Path) -> int:
             break
 
         side = item.get("side", "LONG").upper()
-        max_stop_loss_usdt = _atr_stop(symbol, size, leverage, cfg)
+        max_stop_loss_usdt = _atr_stop(symbol, size, leverage, cfg, sizing=sizing)
         try:
             if side == "SHORT":
                 client.open_short(symbol, size, leverage, max_stop_loss_usdt=max_stop_loss_usdt)

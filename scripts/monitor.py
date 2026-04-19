@@ -13,6 +13,7 @@ from loguru import logger
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))
 
 from lana_bot.config import LOGS_DIR, strategy  # noqa: E402
+from lana_bot.equity import derive_sizing  # noqa: E402
 from lana_bot.execution import get_client  # noqa: E402
 from lana_bot.risk.exit_engine import evaluate_all  # noqa: E402
 from lana_bot.risk.exit_rules import ExitRuleConfig  # noqa: E402
@@ -35,13 +36,14 @@ def main() -> int:
             from lana_bot.config import reload as _reload
             _reload()
             cfg = strategy()
+            sizing = derive_sizing(cfg)
             client = get_client()
-            max_loss = float(cfg["max_stop_loss_per_position_usdt"])
+            max_loss = sizing["max_stop_loss_per_position_usdt"]
             ecfg = cfg.get("exit_rules", {})
             exit_cfg = ExitRuleConfig(
                 risk_multiple_tp=float(ecfg.get("risk_multiple_tp", 1.5)),
                 risk_multiple_tp_close_fraction=float(ecfg.get("risk_multiple_tp_close_fraction", 0.5)),
-                trailing_drawdown_usdt=float(ecfg.get("trailing_drawdown_usdt", 3)),
+                trailing_drawdown_usdt=sizing["trailing_drawdown_usdt"],
                 max_hold_seconds=int(ecfg.get("max_hold_seconds", 6 * 60 * 60)),
             )
             check_once(client, max_loss, exit_cfg)

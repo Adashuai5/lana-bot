@@ -131,6 +131,45 @@ def api_capital():
     })
 
 
+@app.get("/api/schedule")
+def api_schedule():
+    """Return last cycle/scan timestamps so frontend can show countdowns."""
+    import tomllib
+    try:
+        with open(ROOT / "config" / "strategy.toml", "rb") as f:
+            cfg = tomllib.load(f)
+        cycle_interval_s = int(cfg.get("cycle_minutes", 30)) * 60
+    except Exception:
+        cycle_interval_s = 1800
+
+    # Latest decision file = last cycle
+    decisions_dir = DATA_DIR / "decisions"
+    last_cycle_ts = 0.0
+    if decisions_dir.exists():
+        files = sorted(decisions_dir.glob("*.json"))
+        if files:
+            try:
+                last_cycle_ts = float(files[-1].stem)
+            except ValueError:
+                last_cycle_ts = files[-1].stat().st_mtime
+
+    # Last scan from fast_scan_state
+    last_scan_ts = 0.0
+    scan_state = DATA_DIR / "fast_scan_state.json"
+    if scan_state.exists():
+        try:
+            last_scan_ts = json.loads(scan_state.read_text()).get("last_scan_ts", 0)
+        except Exception:
+            pass
+
+    return jsonify({
+        "last_cycle_ts": last_cycle_ts,
+        "last_scan_ts": last_scan_ts,
+        "cycle_interval_s": cycle_interval_s,
+        "scan_interval_s": 120,
+    })
+
+
 @app.get("/api/exit-stats")
 def api_exit_stats():
     stats = {"hard_sl": 0, "trailing_tp": 0, "time_stop": 0, "signal_decay": 0, "total_closes": 0}

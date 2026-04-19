@@ -196,6 +196,10 @@ main { padding: 12px 20px; max-width: 1400px; margin: 0 auto; display: grid; gap
     <div class="dot dot-off" id="status-dot"></div>
     <span id="status-text">检查中…</span>
   </div>
+  <div id="next-counters" style="display:flex; gap:14px; font-size:12px; color:rgba(255,255,255,0.45);">
+    <span>⚡ <span id="scan-cd">-</span></span>
+    <span>🔄 <span id="cycle-cd">-</span></span>
+  </div>
   <div id="fastscan-pill" style="display:none; position:relative; align-items:center; gap:4px; padding:4px 10px; border-radius:16px; background:rgba(99,102,241,0.15); border:1px solid rgba(99,102,241,0.3); font-size:12px; color:#a5b4fc; max-width:220px; overflow:visible; white-space:nowrap; cursor:default;"
        onmouseenter="document.getElementById('fastscan-tooltip').style.display='block'"
        onmouseleave="document.getElementById('fastscan-tooltip').style.display='none'">
@@ -234,7 +238,7 @@ main { padding: 12px 20px; max-width: 1400px; margin: 0 auto; display: grid; gap
           <div class="ov-card">
             <div class="ov-label">当前持仓</div>
             <div class="ov-value blue" id="ov-count">-</div>
-            <div class="ov-sub" id="ov-count-sub">最多同时持有3个</div>
+            <div class="ov-sub" id="ov-count-sub">当前空仓</div>
           </div>
           <div class="ov-card">
             <div class="ov-label">持仓浮动盈亏</div>
@@ -242,7 +246,7 @@ main { padding: 12px 20px; max-width: 1400px; margin: 0 auto; display: grid; gap
             <div class="ov-sub" id="ov-upnl-sub">尚未锁定</div>
           </div>
           <div class="ov-card">
-            <div class="ov-label">今日已赚 / 已亏</div>
+            <div class="ov-label">今日盈亏（已结算）</div>
             <div class="ov-value" id="ov-rpnl">-</div>
             <div class="ov-sub" id="ov-rpnl-sub">已结算</div>
           </div>
@@ -377,12 +381,24 @@ function switchTab(t) {
 /* ─── countdown ─── */
 let nextRefreshTs = Date.now() + 30000;
 let botRunning = false;
+let lastScanTs = 0, lastCycleTs = 0, scanInterval = 120, cycleInterval = 1800;
+
+function fmtCountdown(s) {
+  if (s <= 0) return '即将';
+  if (s >= 60) return Math.floor(s / 60) + 'm' + Math.floor(s % 60) + 's';
+  return Math.ceil(s) + 's';
+}
+
 setInterval(() => {
+  const now = Date.now() / 1000;
   const s = Math.max(0, Math.ceil((nextRefreshTs - Date.now()) / 1000));
   const txt = document.getElementById('status-text');
-  if (botRunning) {
-    txt.textContent = s > 0 ? `运行中 — ${s}s 后刷新` : '刷新中…';
-  }
+  if (botRunning) txt.textContent = s > 0 ? `运行中 — ${s}s 后刷新` : '刷新中…';
+
+  const scanEl = document.getElementById('scan-cd');
+  const cycleEl = document.getElementById('cycle-cd');
+  if (scanEl) scanEl.textContent = lastScanTs ? fmtCountdown(lastScanTs + scanInterval - now) : '-';
+  if (cycleEl) cycleEl.textContent = lastCycleTs ? fmtCountdown(lastCycleTs + cycleInterval - now) : '-';
 }, 1000);
 
 /* ─── status ─── */
@@ -412,7 +428,7 @@ async function loadPositions() {
   const totalPnl = data.reduce((a, p) => a + (p.unrealized_pnl_usdt ?? 0), 0);
   document.getElementById('ov-count').textContent = data.length;
   document.getElementById('ov-count-sub').textContent =
-    data.length === 0 ? '当前空仓' : `还可以再开 ${3 - data.length} 个`;
+    data.length === 0 ? '当前空仓' : `${data.length} 个持仓中`;
   document.getElementById('ov-upnl').textContent = pnlStr(totalPnl);
   document.getElementById('ov-upnl').className = 'ov-value ' + pnlClass(totalPnl);
   document.getElementById('ov-upnl-sub').textContent = data.length ? '所有持仓合计，未结算' : '暂无持仓';
@@ -426,9 +442,9 @@ async function loadPositions() {
     return;
   }
 
-  const MAX_SL = 10;
   area.innerHTML = `<div class="pos-grid">${data.map(p => {
     const pnl = p.unrealized_pnl_usdt;
+    const MAX_SL = p.max_stop_loss_usdt || 10;
     const slRemain = MAX_SL + (pnl ?? 0);
     const slPct = Math.min(100, Math.max(0, slRemain / MAX_SL * 100));
     const slBarCls = slPct > 60 ? 'sl-bar-ok' : slPct > 30 ? 'sl-bar-warn' : 'sl-bar-danger';
@@ -543,7 +559,7 @@ async function loadWatchlist() {
 
 /* ─── activity ─── */
 async function loadActivity() {
-  journalData = await fetch('/api/journal?n=30').then(r => r.json());
+  journalData = await fetch('/api/journal?n=200').then(r => r.json());
   renderActivity();
 }
 
@@ -614,7 +630,7 @@ function renderActivity() {
       <div class="tl-body">
         <div class="tl-title">${title}</div>
         ${desc ? `<div class="tl-desc">${desc}</div>` : ''}
-        <div class="tl-time">${fmtTime(e.ts_ms)}</div>
+        <div class="tl-time">${fmtAge(e.ts_ms)}</div>
       </div>
     </div>`;
   }).filter(Boolean).join('')}</div>`;
@@ -625,7 +641,7 @@ function escHtml(s) {
 }
 function simplifySkipReason(reason) {
   if (reason.includes('older than 10 minutes')) return '市场数据过期，等待下次扫描';
-  if (reason.includes('cap_reached'))           return '已达到最大持仓数量（3个）';
+  if (reason.includes('cap_reached'))           return '已达到最大持仓数量上限';
   if (reason.includes('daily_loss'))            return '今日亏损已达上限，暂停开仓';
   if (reason.includes('cooldown'))              return '止损冷却中，暂停开仓';
   if (reason.includes('no candidate'))          return '没有找到符合条件的币种';
@@ -639,14 +655,26 @@ async function loadPnlChart() {
   const journal = await fetch('/api/journal?n=200').then(r => r.json());
   const closes = journal.filter(e => e.event === 'close').sort((a, b) => a.ts_ms - b.ts_ms);
 
-  const today_pnl = closes.filter(c => c.ts_ms >= Date.now() - 86400000)
-                          .reduce((a, c) => a + (c.net_pnl_usdt ?? 0), 0);
   const total_pnl = closes.reduce((a, c) => a + (c.net_pnl_usdt ?? 0), 0);
 
-  document.getElementById('ov-rpnl').textContent = pnlStr(today_pnl);
-  document.getElementById('ov-rpnl').className = 'ov-value ' + pnlClass(today_pnl);
+  const today_closes = closes.filter(c => c.ts_ms >= Date.now() - 86400000);
+  const today_wins  = today_closes.filter(c => (c.net_pnl_usdt ?? 0) > 0).reduce((a,c) => a + c.net_pnl_usdt, 0);
+  const today_loss  = today_closes.filter(c => (c.net_pnl_usdt ?? 0) <= 0).reduce((a,c) => a + c.net_pnl_usdt, 0);
+  const rpnlEl = document.getElementById('ov-rpnl');
+  if (today_closes.length === 0) {
+    rpnlEl.textContent = '+0.00U'; rpnlEl.className = 'ov-value gray';
+  } else if (today_wins === 0) {
+    rpnlEl.innerHTML = `<span class="red">${today_loss.toFixed(2)}U</span>`;
+    rpnlEl.className = 'ov-value';
+  } else if (today_loss === 0) {
+    rpnlEl.innerHTML = `<span class="green">+${today_wins.toFixed(2)}U</span>`;
+    rpnlEl.className = 'ov-value';
+  } else {
+    rpnlEl.innerHTML = `<span class="green">+${today_wins.toFixed(2)}</span><span style="color:#ccc;font-size:14px"> / </span><span class="red">${today_loss.toFixed(2)}U</span>`;
+    rpnlEl.className = 'ov-value';
+  }
   document.getElementById('ov-rpnl-sub').textContent =
-    `共 ${closes.filter(c => c.ts_ms >= Date.now() - 86400000).length} 笔已结算`;
+    `共 ${today_closes.length} 笔已结算`;
 
   const labelEl = document.getElementById('pnl-total-label');
   labelEl.textContent = `累计 ${pnlStr(total_pnl)}`;
@@ -735,15 +763,28 @@ async function loadExitStats() {
 /* ─── log viewer ─── */
 function loadLogs() {
   const area = document.getElementById('log-area');
-  const es = new EventSource('/stream/logs');
-  es.onmessage = e => {
-    area.textContent += e.data + '\n';
-    area.scrollTop = area.scrollHeight;
-  };
-  es.onerror = () => {
-    document.getElementById('log-meta').textContent = '连接断开';
-    es.close();
-  };
+  const meta = document.getElementById('log-meta');
+  let retryTimer = null;
+
+  function connect() {
+    if (retryTimer) { clearInterval(retryTimer); retryTimer = null; }
+    const es = new EventSource('/stream/logs');
+    es.onmessage = e => {
+      meta.textContent = '实时';
+      area.textContent += e.data + '\n';
+      if (area.textContent.length > 40000) area.textContent = area.textContent.slice(-30000);
+      area.scrollTop = area.scrollHeight;
+    };
+    es.onerror = () => {
+      es.close();
+      let t = 10;
+      retryTimer = setInterval(() => {
+        meta.textContent = `断开 — ${t--}s 后重连`;
+        if (t < 0) { clearInterval(retryTimer); connect(); }
+      }, 1000);
+    };
+  }
+  connect();
 }
 
 /* ─── actions ─── */
@@ -780,8 +821,19 @@ async function closePosition(symbol) {
 }
 
 /* ─── fast scan status ─── */
+async function loadSchedule() {
+  try {
+    const d = await fetch('/api/schedule').then(r => r.json());
+    lastCycleTs = d.last_cycle_ts || 0;
+    cycleInterval = d.cycle_interval_s || 1800;
+    scanInterval = d.scan_interval_s || 120;
+    if (d.last_scan_ts) lastScanTs = d.last_scan_ts;
+  } catch(e) {}
+}
+
 async function loadFastScan() {
   const s = await fetch('/api/fast-scan').then(r => r.json());
+  if (s.last_scan_ts) lastScanTs = s.last_scan_ts;
   const pill = document.getElementById('fastscan-pill');
   const text = document.getElementById('fastscan-text');
   const tip  = document.getElementById('fastscan-tooltip');
@@ -849,7 +901,7 @@ async function loadCapital() {
 }
 
 async function loadAll() {
-  await Promise.allSettled([loadStatus(), loadPositions(), loadPnlChart(), loadExitStats(), loadSquareStatus(), loadFastScan(), loadCapital()]);
+  await Promise.allSettled([loadStatus(), loadPositions(), loadPnlChart(), loadExitStats(), loadSquareStatus(), loadFastScan(), loadCapital(), loadSchedule()]);
   await Promise.allSettled([loadWatchlist(), loadActivity()]);
   nextRefreshTs = Date.now() + 30000;
 }

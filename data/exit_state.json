@@ -1,1 +1,6 @@
-{}
+{
+  "PROMUSDT": {
+    "peak_pnl_usdt": 26.686427967930882,
+    "fixed_tp_hit": false
+  }
+}

@@ -30,9 +30,13 @@ trap "rm -f $PIDFILE" EXIT INT TERM
 {
   echo "=== cycle start $(date -Iseconds) ==="
 
-  # 1. Collect fresh market data (failure is non-fatal: claude will see stale-data warning)
-  /usr/local/bin/uv run python scripts/collect.py || \
-    echo "WARN: collect.py failed (exit $?) — proceeding to decision with existing candidates"
+  # 1. Collect fresh market data — retry once after 30s on network failure
+  if ! /usr/local/bin/uv run python scripts/collect.py; then
+    echo "WARN: collect.py failed (exit $?) — retrying in 30s"
+    sleep 30
+    /usr/local/bin/uv run python scripts/collect.py || \
+      echo "WARN: collect.py retry also failed — proceeding with existing candidates"
+  fi
 
   # 2. Ask Claude to decide.
   # Use node directly to avoid #!/usr/bin/env node shebang resolution failing in launchd env.
