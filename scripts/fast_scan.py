@@ -43,7 +43,7 @@ def _save_state(state: dict) -> None:
 def _trigger_full_cycle() -> None:
     logger.info("fast_scan: triggering full cycle")
     subprocess.Popen(
-        ["bash", str(ROOT / "scripts" / "cycle.sh")],
+        ["/bin/zsh", str(ROOT / "scripts" / "cycle.sh")],
         cwd=str(ROOT),
         stdout=subprocess.DEVNULL,
         stderr=subprocess.DEVNULL,
@@ -51,6 +51,7 @@ def _trigger_full_cycle() -> None:
 
 
 def main() -> int:
+    logger.remove()  # drop default stderr sink (launchd already captures stderr to file)
     logger.add(LOGS_DIR / "fast_scan.log", rotation="5 MB", retention="7 days")
     cfg = strategy()
     surge_pct = float(cfg.get("fast_scan", {}).get("surge_pct", SURGE_PCT))
@@ -65,10 +66,16 @@ def main() -> int:
         logger.warning("fast_scan: ticker fetch failed: {}", e)
         return 1
 
-    # Find surging symbols not already held
+    short_surge_pct = float(cfg.get("fast_scan", {}).get("short_surge_pct", surge_pct))
+
+    # Find surging symbols not already held.
+    # Two detection paths:
+    #   1. 24h net change >= surge_pct  (existing — catches clean pumps)
+    #   2. gain_from_low >= short_surge_pct  (new — catches pumps that started from
+    #      a high 24h base, making the net 24h change look flat or negative)
     surging = [
         t.symbol for t in tickers
-        if t.price_change_pct >= surge_pct
+        if (t.price_change_pct >= surge_pct or t.gain_from_low_pct >= short_surge_pct)
         and t.quote_volume >= surge_vol
         and t.symbol not in held
     ]

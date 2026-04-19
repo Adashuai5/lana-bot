@@ -18,11 +18,15 @@ TAKER_FEE = 0.0004  # 0.04% one side, applied to notional
 
 class Simulator:
     name = "simulator"
+    is_stub = True
 
     def get_mark_price(self, symbol: str) -> float:
         return fetch_mark_price(symbol)
 
-    def open_long(self, symbol: str, size_usdt: float, leverage: int) -> FillResult:
+    def get_open_positions(self) -> list[dict]:
+        return []  # no exchange to sync with in dry-run
+
+    def open_long(self, symbol: str, size_usdt: float, leverage: int, max_stop_loss_usdt: float | None = None) -> FillResult:
         if positions.find(symbol) is not None:
             raise ValueError(f"already have position in {symbol}")
         price = fetch_mark_price(symbol)
@@ -39,6 +43,7 @@ class Simulator:
             notional_usdt=notional,
             entry_ts_ms=ts,
             mode="dry",
+            max_stop_loss_usdt=max_stop_loss_usdt,
         )
         positions.add(pos)
         journal.log(
@@ -60,7 +65,7 @@ class Simulator:
             leverage=leverage, ts_ms=ts,
         )
 
-    def open_short(self, symbol: str, size_usdt: float, leverage: int) -> FillResult:
+    def open_short(self, symbol: str, size_usdt: float, leverage: int, max_stop_loss_usdt: float | None = None) -> FillResult:
         if positions.find(symbol) is not None:
             raise ValueError(f"already have position in {symbol}")
         price = fetch_mark_price(symbol)
@@ -77,6 +82,7 @@ class Simulator:
             notional_usdt=notional,
             entry_ts_ms=ts,
             mode="dry",
+            max_stop_loss_usdt=max_stop_loss_usdt,
         )
         positions.add(pos)
         journal.log(

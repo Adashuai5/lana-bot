@@ -11,6 +11,7 @@ from pathlib import Path
 from loguru import logger
 
 from lana_bot.risk.exit_rules import ExitRuleConfig, ExitState, evaluate_exit_rules
+from lana_bot.risk.risk_engine import record_profit_close
 from lana_bot.risk.stop_loss import should_stop_out, unrealized_pnl_usdt
 from lana_bot.state import journal, positions
 
@@ -42,8 +43,9 @@ def evaluate_all(client, max_loss: float, exit_cfg: ExitRuleConfig) -> None:
         if pos_state.peak_pnl_usdt != old_peak:
             changed = True
 
-        if should_stop_out(pos, mark, max_loss):
-            _trigger_stop_loss(client, pos, mark, pnl, max_loss)
+        effective_max_loss = pos.max_stop_loss_usdt if pos.max_stop_loss_usdt is not None else max_loss
+        if should_stop_out(pos, mark, effective_max_loss):
+            _trigger_stop_loss(client, pos, mark, pnl, effective_max_loss)
             state.pop(pos.symbol, None)
             changed = True
             continue
@@ -51,7 +53,7 @@ def evaluate_all(client, max_loss: float, exit_cfg: ExitRuleConfig) -> None:
         decision = evaluate_exit_rules(
             pos=pos,
             pnl_usdt=pnl,
-            max_loss_usdt=max_loss,
+            max_loss_usdt=effective_max_loss,
             hold_seconds=hold_seconds,
             state=pos_state,
             cfg=exit_cfg,
@@ -82,6 +84,8 @@ def evaluate_all(client, max_loss: float, exit_cfg: ExitRuleConfig) -> None:
             )
             if decision.close_fraction >= 1.0:
                 state.pop(pos.symbol, None)
+            if pnl > 0:
+                record_profit_close(pos.symbol, position_id=pos.position_id)
             changed = True
         except Exception as e:  # noqa: BLE001
             logger.error("close failed during {} for {}: {}", decision.exit_type, pos.symbol, e)
@@ -135,6 +139,6 @@ def _load_exit_state() -> dict[str, ExitState]:
 
 def _save_exit_state(state: dict[str, ExitState]) -> None:
     EXIT_STATE_FILE.parent.mkdir(parents=True, exist_ok=True)
-    EXIT_STATE_FILE.write_text(
-        json.dumps({sym: vars(st) for sym, st in state.items()}, indent=2),
-    )
+    tmp = EXIT_STATE_FILE.with_suffix(".tmp")
+    tmp.write_text(json.dumps({sym: vars(st) for sym, st in state.items()}, indent=2))
+    tmp.replace(EXIT_STATE_FILE)

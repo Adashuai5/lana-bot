@@ -19,14 +19,19 @@ min_24h_volume_usdt = 5_000_000
 min_24h_change_pct = 10
 min_oi_change_1h_pct = 5
 top_n_candidates = 20
+min_pullback_from_high_pct = 3.0  # skip if price within 3% of 5h high (avoid chasing peaks)
+min_short_gain_pct = 15.0         # secondary stage1 path: accept if gain_from_24h_low >= 15% even when 24h net < 10%
+max_oi_gap_bars_1h = 2            # max consecutive counter-direction bars in 1h OI window (was ratio 0.55)
+max_oi_gap_bars_4h = 3            # max consecutive counter-direction bars in 4h OI window (was ratio 0.50)
 
 [square]
 enabled = true
 top_n_trending = 20
 
 [fast_scan]
-surge_pct      = 15.0        # 5分钟扫描触发阈值：24h涨幅超过此值视为异动
-surge_vol_usdt = 20_000_000  # 最低成交量门槛（20M USDT）
+surge_pct       = 15.0        # 触发阈值：24h涨幅 OR gain_from_low 超过此值视为异动
+short_surge_pct = 15.0        # gain_from_low 专用阈值（可单独调低以更敏感地捕捉日内泵）
+surge_vol_usdt  = 20_000_000  # 最低成交量门槛（20M USDT）
 
 [short_filters]
 enabled = true
@@ -41,7 +46,12 @@ max_daily_loss_usdt = 30        # halt opens once 24h realized PnL ≤ -30U (~30
 max_unrealized_drawdown_usdt = 20 # halt opens once combined unrealized PnL ≤ -20U
 max_sector_exposure_pct = 0      # disabled: 200U notional vs 50U capital always triggers; stop-loss is the real guard
 max_daily_opens = 12            # cap opens per 24h (~cycle cadence * 3 candidates)
-stop_loss_cooldown_min = 0      # disabled: per-symbol cooldown handled in decision logic
+stop_loss_cooldown_min = 0      # account-level SL cooldown (disabled; per-symbol below)
+max_daily_sl_per_symbol = 2     # per-symbol: ≥ N SLs today → block all-day
+symbol_sl_cooldown_min = 90     # per-symbol: cooldown minutes after any SL
+atr_stop_multiplier = 1.5       # stop = 1.5 × ATR × notional; set to 0 to use fixed stop only
+atr_stop_min_usdt = 8           # floor: never tighter than 8U (40% of 20U margin)
+atr_stop_max_usdt = 14          # ceiling: never wider than 14U (70% of 20U margin)
 
 [exit_rules]
 risk_multiple_tp = 1.5

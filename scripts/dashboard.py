@@ -94,6 +94,43 @@ def api_square_status():
     return jsonify(get_square_status())
 
 
+@app.get("/api/capital")
+def api_capital():
+    """Total equity = initial_capital + realized PnL + unrealized PnL."""
+    import tomllib
+    cfg_path = ROOT / "config" / "strategy.toml"
+    try:
+        with open(cfg_path, "rb") as f:
+            cfg = tomllib.load(f)
+    except Exception:
+        cfg = {}
+    initial = float(cfg.get("initial_capital_usdt", 50))
+
+    realized = 0.0
+    if JOURNAL.exists():
+        for line in JOURNAL.read_text().splitlines():
+            if not line.strip():
+                continue
+            rec = json.loads(line)
+            if rec.get("event") == "close":
+                realized += float(rec.get("net_pnl_usdt", 0))
+
+    unrealized = 0.0
+    for pos in list_positions():
+        try:
+            mark = fetch_mark_price(pos.symbol)
+            unrealized += unrealized_pnl_usdt(pos, mark)
+        except Exception:
+            pass
+
+    return jsonify({
+        "initial_capital_usdt": initial,
+        "realized_pnl_usdt": round(realized, 4),
+        "unrealized_pnl_usdt": round(unrealized, 4),
+        "equity_usdt": round(initial + realized + unrealized, 4),
+    })
+
+
 @app.get("/api/exit-stats")
 def api_exit_stats():
     stats = {"hard_sl": 0, "trailing_tp": 0, "time_stop": 0, "signal_decay": 0, "total_closes": 0}

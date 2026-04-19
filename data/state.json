@@ -1,0 +1,27 @@
+{
+  "_version": 5,
+  "risk": {
+    "last_stop_loss_ts_ms": 1776575127805,
+    "stop_loss_log": [
+      {
+        "symbol": "TESTUSDT",
+        "ts_ms": 1776575127805
+      }
+    ],
+    "symbol_history": {
+      "TESTUSDT": {
+        "daily_sl_count": 1,
+        "daily_sl_date": "2026-04-19",
+        "last_sl_ts_ms": 1776575127805
+      }
+    },
+    "processed_closes": {
+      "test-pos-001": 1776575127.807584
+    }
+  },
+  "scores": {
+    "TEST": 0.3773,
+    "TESTUSDT": 0.77,
+    "ATOMICTEST": 0.99
+  }
+}

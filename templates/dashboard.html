@@ -51,7 +51,7 @@ main { padding: 12px 20px; max-width: 1400px; margin: 0 auto; display: grid; gap
   background: #fff; border-radius: 12px; padding: 12px 16px;
   box-shadow: 0 1px 4px rgba(0,0,0,0.06);
 }
-.overview-grid { display: grid; grid-template-columns: repeat(4,1fr); gap: 0; }
+.overview-grid { display: grid; grid-template-columns: repeat(5,1fr); gap: 0; }
 .ov-card { padding: 8px 12px; border-right: 1px solid #f0f0f0; }
 .ov-card:last-child { border-right: none; }
 .ov-label { font-size: 11px; color: #888; margin-bottom: 4px; font-weight: 500; }
@@ -181,6 +181,7 @@ main { padding: 12px 20px; max-width: 1400px; margin: 0 auto; display: grid; gap
 
 @media (max-width: 900px) {
   .overview { grid-template-columns: repeat(2, 1fr); }
+  .overview-grid { grid-template-columns: repeat(3, 1fr) !important; }
   main { padding: 12px 16px; }
   main > div[style*="grid-template-columns"] { display: block !important; }
   main > div[style*="grid-template-columns"] > .section { margin-bottom: 16px; }
@@ -249,6 +250,11 @@ main { padding: 12px 20px; max-width: 1400px; margin: 0 auto; display: grid; gap
             <div class="ov-label">正在观察的币</div>
             <div class="ov-value blue" id="ov-cands">-</div>
             <div class="ov-sub" id="ov-cands-age">机器人候选列表</div>
+          </div>
+          <div class="ov-card">
+            <div class="ov-label">总净值</div>
+            <div class="ov-value" id="ov-equity">-</div>
+            <div class="ov-sub" id="ov-equity-sub">初始+累计盈亏</div>
           </div>
         </div>
       </div>
@@ -833,8 +839,17 @@ async function loadSquareStatus() {
 }
 
 /* ─── main ─── */
+async function loadCapital() {
+  const d = await fetch('/api/capital').then(r => r.json());
+  const el = document.getElementById('ov-equity');
+  el.textContent = d.equity_usdt.toFixed(2) + 'U';
+  el.className = 'ov-value ' + pnlClass(d.equity_usdt - d.initial_capital_usdt);
+  document.getElementById('ov-equity-sub').textContent =
+    `本金${d.initial_capital_usdt}U · 已结${d.realized_pnl_usdt >= 0 ? '+' : ''}${d.realized_pnl_usdt.toFixed(2)}U`;
+}
+
 async function loadAll() {
-  await Promise.allSettled([loadStatus(), loadPositions(), loadPnlChart(), loadExitStats(), loadSquareStatus(), loadFastScan()]);
+  await Promise.allSettled([loadStatus(), loadPositions(), loadPnlChart(), loadExitStats(), loadSquareStatus(), loadFastScan(), loadCapital()]);
   await Promise.allSettled([loadWatchlist(), loadActivity()]);
   nextRefreshTs = Date.now() + 30000;
 }

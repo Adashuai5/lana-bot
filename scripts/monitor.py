@@ -26,6 +26,7 @@ def check_once(client, max_loss: float, exit_cfg: ExitRuleConfig) -> None:
 
 
 def main() -> int:
+    logger.remove()  # drop default stderr sink (launchd redirects stderr to monitor.log too)
     logger.add(LOGS_DIR / "monitor.log", rotation="10 MB", retention="14 days")
     logger.info("stop-loss monitor starting, poll={}s", POLL_SECONDS)
 

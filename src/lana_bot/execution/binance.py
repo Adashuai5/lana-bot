@@ -75,7 +75,18 @@ class BinanceFutures:
     def get_mark_price(self, symbol: str) -> float:
         return fetch_mark_price(symbol)
 
-    def open_long(self, symbol: str, size_usdt: float, leverage: int) -> FillResult:
+    def get_open_positions(self) -> list[dict]:
+        """Return non-zero positions from Binance FAPI /v2/positionRisk."""
+        r = self._session.get(
+            f"{FAPI_BASE}/fapi/v2/positionRisk",
+            params=self._sign({}),
+            timeout=10,
+        )
+        if not r.ok:
+            raise RuntimeError(f"Binance positionRisk {r.status_code}: {r.text}")
+        return [p for p in r.json() if abs(float(p.get("positionAmt", 0))) > 0]
+
+    def open_long(self, symbol: str, size_usdt: float, leverage: int, max_stop_loss_usdt: float | None = None) -> FillResult:
         if positions.find(symbol) is not None:
             raise ValueError(f"already have position in {symbol}")
 
@@ -105,6 +116,7 @@ class BinanceFutures:
             notional_usdt=notional,
             entry_ts_ms=ts,
             mode="live",
+            max_stop_loss_usdt=max_stop_loss_usdt,
         )
         positions.add(pos)
         journal.log("open", {
@@ -124,7 +136,7 @@ class BinanceFutures:
             size_usdt=size_usdt, leverage=leverage, ts_ms=ts,
         )
 
-    def open_short(self, symbol: str, size_usdt: float, leverage: int) -> FillResult:
+    def open_short(self, symbol: str, size_usdt: float, leverage: int, max_stop_loss_usdt: float | None = None) -> FillResult:
         if positions.find(symbol) is not None:
             raise ValueError(f"already have position in {symbol}")
 
@@ -154,6 +166,7 @@ class BinanceFutures:
             notional_usdt=notional,
             entry_ts_ms=ts,
             mode="live",
+            max_stop_loss_usdt=max_stop_loss_usdt,
         )
         positions.add(pos)
         journal.log("open", {

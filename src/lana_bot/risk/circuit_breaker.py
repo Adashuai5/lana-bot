@@ -8,14 +8,15 @@ from __future__ import annotations
 import json
 import time
 from dataclasses import dataclass, field
+from datetime import datetime, timezone
 
 from lana_bot.config import DATA_DIR
 from lana_bot.data.binance_futures import fetch_mark_price
 from lana_bot.risk.stop_loss import unrealized_pnl_usdt
-from lana_bot.state import positions
+from lana_bot.risk.symbol_score import score_allows_open
+from lana_bot.state import positions, risk_score_state
 
 JOURNAL_FILE = DATA_DIR / "journal.ndjson"
-RISK_STATE_FILE = DATA_DIR / "risk_state.json"
 DAY_MS = 24 * 60 * 60 * 1000
 
 # Common meme clusters for correlation/crowding control.
@@ -50,14 +51,23 @@ def _deny(dimension: str, reason: str, **details) -> BreakerDecision:
 
 
 def _direct_stop_loss_ts_ms() -> int | None:
-    """Read stop-loss timestamp from risk_state.json (written directly, no log parsing)."""
-    if not RISK_STATE_FILE.exists():
-        return None
+    """Read stop-loss timestamp from unified state.json."""
     try:
-        v = json.loads(RISK_STATE_FILE.read_text()).get("last_stop_loss_ts_ms", 0)
+        v = risk_score_state.load()["risk"].get("last_stop_loss_ts_ms", 0)
         return v or None
     except Exception:  # noqa: BLE001
         return None
+
+
+def _symbol_history(symbol: str) -> dict:
+    try:
+        return risk_score_state.load()["risk"].get("symbol_history", {}).get(symbol, {})
+    except Exception:  # noqa: BLE001
+        return {}
+
+
+def _today_utc() -> str:
+    return datetime.now(timezone.utc).strftime("%Y-%m-%d")
 
 
 def _iter_recent_events(window_ms: int) -> list[dict]:
@@ -226,5 +236,44 @@ def check_can_open(
                     elapsed_min=round(elapsed_min, 4),
                     cooldown_min=cooldown_min,
                 )
+
+    if pending_symbol:
+        sym_hist = _symbol_history(pending_symbol)
+        today = _today_utc()
+        max_daily_sl = int(risk.get("max_daily_sl_per_symbol", 2))
+        sym_cooldown_min = float(risk.get("symbol_sl_cooldown_min", 90))
+
+        if max_daily_sl > 0 and sym_hist.get("daily_sl_date") == today:
+            count = int(sym_hist.get("daily_sl_count", 0))
+            if count >= max_daily_sl:
+                return _deny(
+                    "symbol_daily_sl_cap",
+                    f"symbol_daily_sl_cap: {pending_symbol} has {count} SLs today >= {max_daily_sl}",
+                    symbol=pending_symbol,
+                    daily_sl_count=count,
+                    max_daily_sl_per_symbol=max_daily_sl,
+                )
+
+        if sym_cooldown_min > 0:
+            last_sym_sl = sym_hist.get("last_sl_ts_ms")
+            if last_sym_sl:
+                elapsed_min = (int(time.time() * 1000) - int(last_sym_sl)) / 60_000
+                if elapsed_min < sym_cooldown_min:
+                    return _deny(
+                        "symbol_sl_cooldown",
+                        f"symbol_sl_cooldown: {pending_symbol} SL {elapsed_min:.1f}min ago < {sym_cooldown_min}min",
+                        symbol=pending_symbol,
+                        elapsed_min=round(elapsed_min, 4),
+                        symbol_sl_cooldown_min=sym_cooldown_min,
+                    )
+
+        allowed, score = score_allows_open(pending_symbol)
+        if not allowed:
+            return _deny(
+                "symbol_score_low",
+                f"symbol_score_low: {pending_symbol} score={score:.3f} < 0.5",
+                symbol=pending_symbol,
+                score=score,
+            )
 
     return BreakerDecision(True, "ok", dimension="ok", details={})

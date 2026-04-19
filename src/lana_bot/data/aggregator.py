@@ -15,6 +15,7 @@ from loguru import logger
 from lana_bot.config import strategy
 from lana_bot.data.binance_futures import (
     fetch_all_24h_tickers,
+    fetch_klines,
     fetch_oi_history,
     oi_change_pct,
 )
@@ -33,8 +34,11 @@ class Candidate:
     oi_score: float
     liquidity_score: float
     score: float
-    square_mentions: int = 0  # populated later when square scraper lands
+    square_mentions: int = 0
     side: str = "LONG"  # "LONG" | "SHORT"
+    pct_from_4h_high: float = 0.0   # how far below 5h peak (higher = more pullback = safer entry)
+    atr_pct: float = 0.0            # avg true range as % of price over last 5h (volatility proxy)
+    gain_from_low_pct: float = 0.0  # gain from 24h low; high value = active pump even if 24h net is negative
 
 
 def _slope(points: list[float]) -> float:
@@ -53,6 +57,24 @@ def _continuity_ratio(values: list[float]) -> float:
     sign = 1 if overall > 0 else -1
     aligned = sum(1 for d in deltas if d * sign > 0)
     return aligned / len(deltas)
+
+
+def _max_counter_run(values: list[float]) -> int:
+    """Max consecutive bars moving against the overall direction."""
+    if len(values) < 3:
+        return 0
+    overall = values[-1] - values[0]
+    if overall == 0:
+        return 0
+    sign = 1 if overall > 0 else -1
+    max_run = cur = 0
+    for i in range(1, len(values)):
+        if (values[i] - values[i - 1]) * sign <= 0:
+            cur += 1
+            max_run = max(max_run, cur)
+        else:
+            cur = 0
+    return max_run
 
 
 def _step_volatility_pct(values: list[float]) -> float:
@@ -115,32 +137,39 @@ def build_candidates(square_mentions: dict[str, int] | None = None) -> dict:
     regime = safe_compute_market_regime(tickers_24h=tickers, cfg=cfg)
 
     filter_reason_stats: Counter[str] = Counter()
+    min_short_gain = float(filters.get("min_short_gain_pct", 0))
 
-    # Stage 1: legacy hard filters.
+    # Stage 1: hard filters.
+    # Primary path: 24h net change >= threshold (clean pump).
+    # Secondary path: gain_from_low >= min_short_gain (pump from day's bottom,
+    #   invisible to 24h net change when 24h base price was already elevated).
     stage1_passed = []
     for t in tickers:
-        stage1_failed = False
         if t.quote_volume < filters["min_24h_volume_usdt"]:
             filter_reason_stats["stage1_low_volume"] += 1
-            stage1_failed = True
-        if t.price_change_pct < filters["min_24h_change_pct"]:
+            continue
+        passes_24h = t.price_change_pct >= filters["min_24h_change_pct"]
+        passes_low = min_short_gain > 0 and t.gain_from_low_pct >= min_short_gain
+        if not passes_24h and not passes_low:
             filter_reason_stats["stage1_low_24h_change"] += 1
-            stage1_failed = True
-        if not stage1_failed:
-            stage1_passed.append(t)
+            continue
+        stage1_passed.append(t)
 
-    # Sort by raw gain first so we cap OI-history fetches to top movers
-    stage1_passed.sort(key=lambda t: t.price_change_pct, reverse=True)
+    # Sort: prefer 24h movers first, then gain_from_low candidates
+    stage1_passed.sort(
+        key=lambda t: max(t.price_change_pct, t.gain_from_low_pct),
+        reverse=True,
+    )
     prefiltered = stage1_passed[: filters["top_n_candidates"] * 2]
     logger.info("stage1 filtered to {}", len(prefiltered))
 
     min_oi_4h = float(filters.get("min_oi_change_4h_pct", 0))
-    min_cont_1h = float(filters.get("min_oi_continuity_1h", 0.55))
-    min_cont_4h = float(filters.get("min_oi_continuity_4h", 0.50))
+    max_gap_1h = int(filters.get("max_oi_gap_bars_1h", 2))   # max consecutive counter bars in 1h window
+    max_gap_4h = int(filters.get("max_oi_gap_bars_4h", 3))   # max consecutive counter bars in 4h window
     max_step_vol = float(filters.get("max_oi_step_volatility_pct", 1.5))
-    require_slope_consistency = bool(filters.get("require_oi_slope_consistency", True))
+    min_pullback_pct = float(filters.get("min_pullback_from_high_pct", 0))
 
-    # Stage 2: OI stability constraints.
+    # Stage 2: OI stability constraints + pullback filter.
     stage2_rows: list[dict[str, float | str | int]] = []
     for t in prefiltered:
         try:
@@ -156,11 +185,9 @@ def build_candidates(square_mentions: dict[str, int] | None = None) -> dict:
 
         oi_pct_1h = oi_change_pct(oi_1h_points)
         oi_pct_4h = oi_change_pct(oi_points)
-        continuity_1h = _continuity_ratio(oi_1h_values)
-        continuity_4h = _continuity_ratio(oi_values)
         step_volatility = _step_volatility_pct(oi_values)
-        slope_1h = _slope(oi_1h_values)
-        slope_4h = _slope(oi_values)
+        gap_1h = _max_counter_run(oi_1h_values)
+        gap_4h = _max_counter_run(oi_values)
 
         stage2_failed = False
         if oi_pct_1h < filters["min_oi_change_1h_pct"]:
@@ -169,30 +196,53 @@ def build_candidates(square_mentions: dict[str, int] | None = None) -> dict:
         if oi_pct_4h < min_oi_4h:
             filter_reason_stats["stage2_low_oi_change_4h"] += 1
             stage2_failed = True
-        if continuity_1h < min_cont_1h:
+        if gap_1h > max_gap_1h:
             filter_reason_stats["stage2_low_continuity_1h"] += 1
             stage2_failed = True
-        if continuity_4h < min_cont_4h:
+        if gap_4h > max_gap_4h:
             filter_reason_stats["stage2_low_continuity_4h"] += 1
             stage2_failed = True
         if step_volatility > max_step_vol:
             filter_reason_stats["stage2_high_oi_volatility"] += 1
             stage2_failed = True
-        if require_slope_consistency and slope_1h * slope_4h < 0:
-            filter_reason_stats["stage2_slope_inconsistent"] += 1
+
+        # Kline-based metrics: pullback from peak + ATR
+        pct_from_4h_high = 0.0
+        atr_pct = 0.0
+        try:
+            klines = fetch_klines(t.symbol, interval="1h", limit=5)
+            if klines:
+                peak = max(k.high for k in klines)
+                pct_from_4h_high = (peak - t.last_price) / peak * 100 if peak > 0 else 0.0
+                atr_pct = statistics.fmean(
+                    (k.high - k.low) / k.close * 100 for k in klines if k.close > 0
+                )
+        except Exception as e:  # noqa: BLE001
+            logger.warning("kline fetch failed for {}: {}", t.symbol, e)
+
+        if min_pullback_pct > 0 and pct_from_4h_high < min_pullback_pct:
+            filter_reason_stats["stage2_at_peak"] += 1
             stage2_failed = True
+
         if stage2_failed:
             continue
 
+        # Use the stronger of 24h change or gain_from_low as the trend signal.
+        # This prevents gain_from_low candidates from being buried by a negative price_change_pct.
+        effective_gain = max(t.price_change_pct, t.gain_from_low_pct)
         stage2_rows.append(
             {
                 "symbol": t.symbol,
                 "last_price": t.last_price,
                 "price_change_pct": t.price_change_pct,
+                "gain_from_low_pct": round(t.gain_from_low_pct, 2),
+                "effective_gain_pct": round(effective_gain, 2),
                 "quote_volume_usdt": t.quote_volume,
                 "oi_change_1h_pct": oi_pct_1h,
                 "oi_change_4h_pct": oi_pct_4h,
                 "square_mentions": square_mentions.get(t.symbol, 0),
+                "pct_from_4h_high": round(pct_from_4h_high, 2),
+                "atr_pct": round(atr_pct, 2),
             }
         )
 
@@ -200,7 +250,7 @@ def build_candidates(square_mentions: dict[str, int] | None = None) -> dict:
 
     candidates: list[Candidate] = []
     if stage2_rows:
-        trend_raw = [float(r["price_change_pct"]) for r in stage2_rows]
+        trend_raw = [float(r["effective_gain_pct"]) for r in stage2_rows]
         oi_raw = [float(r["oi_change_1h_pct"]) * 0.6 + float(r["oi_change_4h_pct"]) * 0.4 for r in stage2_rows]
         liquidity_raw = [math.log10(max(float(r["quote_volume_usdt"]), 1.0)) for r in stage2_rows]
 
@@ -229,6 +279,9 @@ def build_candidates(square_mentions: dict[str, int] | None = None) -> dict:
                     liquidity_score=liquidity_score,
                     score=score,
                     square_mentions=mentions,
+                    pct_from_4h_high=float(row.get("pct_from_4h_high", 0.0)),
+                    atr_pct=float(row.get("atr_pct", 0.0)),
+                    gain_from_low_pct=float(row.get("gain_from_low_pct", 0.0)),
                 )
             )
 

@@ -18,6 +18,15 @@ class Ticker24h:
     last_price: float
     price_change_pct: float
     quote_volume: float
+    high_price: float = 0.0
+    low_price: float = 0.0
+
+    @property
+    def gain_from_low_pct(self) -> float:
+        """How much price has risen from the 24h low. Catches pumps invisible to 24h net change."""
+        if self.low_price <= 0:
+            return 0.0
+        return (self.last_price - self.low_price) / self.low_price * 100
 
 
 @dataclass
@@ -41,6 +50,8 @@ def fetch_all_24h_tickers() -> list[Ticker24h]:
                 last_price=float(item["lastPrice"]),
                 price_change_pct=float(item["priceChangePercent"]),
                 quote_volume=float(item["quoteVolume"]),
+                high_price=float(item.get("highPrice", 0) or 0),
+                low_price=float(item.get("lowPrice", 0) or 0),
             )
         )
     return out
@@ -72,6 +83,24 @@ def fetch_mark_price(symbol: str) -> float:
     )
     r.raise_for_status()
     return float(r.json()["markPrice"])
+
+
+@dataclass
+class KlineBar:
+    high: float
+    low: float
+    close: float
+
+
+def fetch_klines(symbol: str, interval: str = "1h", limit: int = 5) -> list[KlineBar]:
+    """Fetch OHLC klines. Returns up to `limit` bars."""
+    r = httpx.get(
+        f"{BASE_URL}/fapi/v1/klines",
+        params={"symbol": symbol, "interval": interval, "limit": limit},
+        timeout=TIMEOUT,
+    )
+    r.raise_for_status()
+    return [KlineBar(high=float(k[2]), low=float(k[3]), close=float(k[4])) for k in r.json()]
 
 
 def oi_change_pct(points: list[OiPoint]) -> float:

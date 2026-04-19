@@ -30,6 +30,14 @@ decision file, invoke the executor, then stop.
    - **Longs** (`candidates`): Is momentum real (gain + OI confirming)? OI up
      with price up = strong. OI up with price flat = watch. OI down with price
      up = short squeeze risk (skip for long).
+     - `pct_from_4h_high`: how far below the 5h peak (%). Higher = more pullback =
+       safer entry. Values <3% mean price is still near peak — be extra skeptical.
+     - `atr_pct`: 1h avg true range as % of price (volatility proxy). ATR >8% means
+       normal swings can exceed the stop — require stronger OI confirmation.
+     - `gain_from_low_pct`: how much price has risen from the 24h low. A candidate
+       may reach you via this path with a negative `price_change_pct` — that's normal
+       for a symbol that pumped from the bottom of its 24h range. Judge entry quality
+       by OI confirmation and `pct_from_4h_high`, not raw 24h change.
    - **Shorts** (`short_candidates`): Price surged >30% but OI is dropping =
      squeeze exhaustion. Short these only when the squeeze looks spent (price
      slowing, OI still falling). High conviction required — meme pumps can
