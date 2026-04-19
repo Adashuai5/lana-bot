@@ -129,7 +129,7 @@ def _bounded_score(z: float) -> float:
 
 def build_candidates(square_mentions: dict[str, int] | None = None) -> dict:
     cfg = strategy()
-    filters = cfg["filters"]
+    filters = cfg["aggregator"]
     square_mentions = square_mentions or {}
 
     tickers = fetch_all_24h_tickers()
@@ -143,10 +143,14 @@ def build_candidates(square_mentions: dict[str, int] | None = None) -> dict:
     # Primary path: 24h net change >= threshold (clean pump).
     # Secondary path: gain_from_low >= min_short_gain (pump from day's bottom,
     #   invisible to 24h net change when 24h base price was already elevated).
+    max_24h_change = float(filters.get("max_24h_change_pct", 0))
     stage1_passed = []
     for t in tickers:
         if t.quote_volume < filters["min_24h_volume_usdt"]:
             filter_reason_stats["stage1_low_volume"] += 1
+            continue
+        if max_24h_change > 0 and t.price_change_pct > max_24h_change:
+            filter_reason_stats["stage1_chasing_high"] += 1
             continue
         passes_24h = t.price_change_pct >= filters["min_24h_change_pct"]
         passes_low = min_short_gain > 0 and t.gain_from_low_pct >= min_short_gain

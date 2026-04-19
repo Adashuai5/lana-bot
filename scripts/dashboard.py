@@ -143,7 +143,7 @@ def api_schedule():
         cycle_interval_s = 1800
 
     # Latest decision file = last cycle
-    decisions_dir = DATA_DIR / "decisions"
+    decisions_dir = ROOT / "data" / "decisions"
     last_cycle_ts = 0.0
     if decisions_dir.exists():
         files = sorted(decisions_dir.glob("*.json"))
@@ -155,7 +155,7 @@ def api_schedule():
 
     # Last scan from fast_scan_state
     last_scan_ts = 0.0
-    scan_state = DATA_DIR / "fast_scan_state.json"
+    scan_state = ROOT / "data" / "fast_scan_state.json"
     if scan_state.exists():
         try:
             last_scan_ts = json.loads(scan_state.read_text()).get("last_scan_ts", 0)
@@ -167,6 +167,62 @@ def api_schedule():
         "last_scan_ts": last_scan_ts,
         "cycle_interval_s": cycle_interval_s,
         "scan_interval_s": 120,
+    })
+
+
+@app.get("/api/risk-status")
+def api_risk_status():
+    import tomllib
+    cfg_path = ROOT / "config" / "strategy.toml"
+    try:
+        with open(cfg_path, "rb") as f:
+            cfg = tomllib.load(f)
+    except Exception:
+        cfg = {}
+    initial = float(cfg.get("initial_capital_usdt", 50))
+    risk_cfg = cfg.get("risk", {})
+    soft_pct   = float(risk_cfg.get("daily_loss_soft_pct",   0.20))
+    strict_pct = float(risk_cfg.get("daily_loss_strict_pct", 0.40))
+    hard_pct   = float(risk_cfg.get("max_daily_loss_pct",    0.60))
+
+    realized_total = 0.0
+    today_realized = 0.0
+    day_ms = 86400 * 1000
+    now_ms = int(time.time() * 1000)
+    cutoff_ms = now_ms - day_ms
+    if JOURNAL.exists():
+        for line in JOURNAL.read_text().splitlines():
+            if not line.strip():
+                continue
+            rec = json.loads(line)
+            if rec.get("event") == "close":
+                pnl = float(rec.get("net_pnl_usdt", 0))
+                realized_total += pnl
+                if rec.get("ts_ms", 0) >= cutoff_ms:
+                    today_realized += pnl
+
+    equity = initial + realized_total
+    loss_pct = 0.0
+    if equity > 0 and today_realized < 0:
+        loss_pct = -today_realized / equity
+
+    if loss_pct >= hard_pct:
+        level = "hard"
+    elif loss_pct >= strict_pct:
+        level = "strict"
+    elif loss_pct >= soft_pct:
+        level = "soft"
+    else:
+        level = "none"
+
+    return jsonify({
+        "level": level,
+        "today_realized_pnl_usdt": round(today_realized, 4),
+        "loss_pct": round(loss_pct, 4),
+        "equity_usdt": round(equity, 4),
+        "soft_threshold_pct": soft_pct,
+        "strict_threshold_pct": strict_pct,
+        "hard_threshold_pct": hard_pct,
     })
 
 

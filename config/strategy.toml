@@ -21,7 +21,7 @@ max_concurrent_positions = 2
 leverage = 10
 cycle_minutes = 30
 
-[filters]
+[aggregator]
 min_24h_volume_usdt = 5_000_000
 min_24h_change_pct = 10
 min_oi_change_1h_pct = 5
@@ -30,9 +30,17 @@ min_pullback_from_high_pct = 4.0  # skip if price within 3% of 5h high (avoid ch
 min_short_gain_pct = 15.0         # secondary stage1 path: accept if gain_from_24h_low >= 15% even when 24h net < 10%
 max_oi_gap_bars_1h = 2            # max consecutive counter-direction bars in 1h OI window (was ratio 0.55)
 max_oi_gap_bars_4h = 3            # max consecutive counter-direction bars in 4h OI window (was ratio 0.50)
+max_24h_change_pct = 40           # 追高上限：24h涨幅超过此值直接过滤，不进入候选
 fomo_gain_from_low_pct = 50.0    # FOMO路径：gain_from_low >= 此值时视为持续泵
 fomo_atr_max_pct = 15.0          # FOMO路径：ATR < 此值说明波动收窄（趋势稳定）
 fomo_oi_min_pct = 2.0            # FOMO路径：放宽OI门槛至此值（正常门槛5%）
+
+[strategy]
+# 硬门槛：decide.py 唯一决策入口，AI BUY_LIKELY + 规则通过 → 开仓
+min_price_change_pct = 10     # 24h 涨幅下限
+max_price_change_pct = 40     # 24h 涨幅上限（与 [aggregator].max_24h_change_pct 一致，独立双保险）
+min_oi_change_1h_pct = 5      # 1h OI 变化下限
+min_pct_from_4h_high = 3      # 距峰值回调下限（%）
 
 [square]
 enabled = true
@@ -54,7 +62,10 @@ top_n = 5
 # Set any to 0 to disable that gate.
 # 日亏上限和未实现回撤上限：均为当前净值的百分比，随净值自动缩放。
 # 50U净值时：max_daily_loss = 50 × 60% = 30U；max_unrealized_drawdown = 50 × 40% = 20U（与旧值一致）。
-max_daily_loss_pct = 0.60
+# 递进式日亏风控：soft → strict → hard，不一刀切封禁
+daily_loss_soft_pct = 0.20    # 亏损 > 20% 净值：仓位×0.5
+daily_loss_strict_pct = 0.40  # 亏损 > 40% 净值：仓位×0.25
+max_daily_loss_pct = 0.60     # 亏损 > 60% 净值：禁止新开仓（平仓不受影响）
 max_unrealized_drawdown_pct = 0.40
 max_sector_exposure_pct = 0      # 禁用：200U notional vs 50U capital 始终触发，真实保护来自止损
 max_daily_opens = 12            # 24h 最多开仓次数

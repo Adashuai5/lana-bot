@@ -51,7 +51,7 @@ main { padding: 12px 20px; max-width: 1400px; margin: 0 auto; display: grid; gap
   background: #fff; border-radius: 12px; padding: 12px 16px;
   box-shadow: 0 1px 4px rgba(0,0,0,0.06);
 }
-.overview-grid { display: grid; grid-template-columns: repeat(5,1fr); gap: 0; }
+.overview-grid { display: grid; grid-template-columns: repeat(6,1fr); gap: 0; }
 .ov-card { padding: 8px 12px; border-right: 1px solid #f0f0f0; }
 .ov-card:last-child { border-right: none; }
 .ov-label { font-size: 11px; color: #888; margin-bottom: 4px; font-weight: 500; }
@@ -259,6 +259,14 @@ main { padding: 12px 20px; max-width: 1400px; margin: 0 auto; display: grid; gap
             <div class="ov-label">总净值</div>
             <div class="ov-value" id="ov-equity">-</div>
             <div class="ov-sub" id="ov-equity-sub">初始+累计盈亏</div>
+          </div>
+          <div class="ov-card">
+            <div class="ov-label">日内风控</div>
+            <div class="ov-value" id="ov-risk-level" style="font-size:16px">-</div>
+            <div style="margin-top:5px; height:4px; background:#f0f0f0; border-radius:2px; overflow:hidden;">
+              <div id="ov-risk-bar" style="height:4px; width:0%; border-radius:2px; transition:width .4s, background .4s;"></div>
+            </div>
+            <div class="ov-sub" id="ov-risk-sub">今日亏损比例</div>
           </div>
         </div>
       </div>
@@ -660,7 +668,10 @@ function escHtml(s) {
 function simplifySkipReason(reason) {
   if (reason.includes('older than 10 minutes')) return '市场数据过期，等待下次扫描';
   if (reason.includes('cap_reached'))           return '已达到最大持仓数量上限';
-  if (reason.includes('daily_loss'))            return '今日亏损已达上限，暂停开仓';
+  if (reason.includes('daily_loss_hard'))       return '今日亏损达硬上限（60%），禁止开仓';
+  if (reason.includes('daily_loss_strict'))     return '今日亏损达严格阈值（40%），仓位×0.25';
+  if (reason.includes('daily_loss_soft'))       return '今日亏损达软阈值（20%），仓位×0.5';
+  if (reason.includes('daily_loss'))            return '今日亏损触发风控，仓位受限';
   if (reason.includes('cooldown'))              return '止损冷却中，暂停开仓';
   if (reason.includes('no candidate'))          return '没有找到符合条件的币种';
   if (reason.includes('candidates passed') || reason.includes('qualified') || reason.includes('filtered at stage') || reason.includes('low-gain') || reason.includes('low-volume')) return '没有币种通过筛选条件';
@@ -908,6 +919,26 @@ async function loadSquareStatus() {
   }
 }
 
+/* ─── risk status ─── */
+async function loadRiskStatus() {
+  try {
+    const d = await fetch('/api/risk-status').then(r => r.json());
+    const levelEl = document.getElementById('ov-risk-level');
+    const barEl   = document.getElementById('ov-risk-bar');
+    const subEl   = document.getElementById('ov-risk-sub');
+    const hardPct  = d.hard_threshold_pct  * 100;
+    const barWidth = Math.min(d.loss_pct * 100 / hardPct * 100, 100).toFixed(1);
+    const labels = { none: '正常', soft: '轻度风控', strict: '严格风控', hard: '禁止开仓' };
+    const colors = { none: '#10b981', soft: '#f59e0b', strict: '#f97316', hard: '#ef4444' };
+    const color = colors[d.level] || '#10b981';
+    levelEl.textContent = labels[d.level] || d.level;
+    levelEl.style.color = color;
+    barEl.style.width   = barWidth + '%';
+    barEl.style.background = color;
+    subEl.textContent = `亏${(d.loss_pct*100).toFixed(1)}% / 上限${hardPct.toFixed(0)}%`;
+  } catch(e) {}
+}
+
 /* ─── main ─── */
 async function loadCapital() {
   const d = await fetch('/api/capital').then(r => r.json());
@@ -945,7 +976,7 @@ async function loadReviews() {
 }
 
 async function loadAll() {
-  await Promise.allSettled([loadStatus(), loadPositions(), loadPnlChart(), loadExitStats(), loadSquareStatus(), loadFastScan(), loadCapital(), loadSchedule(), loadReviews(), loadChangelog()]);
+  await Promise.allSettled([loadStatus(), loadPositions(), loadPnlChart(), loadExitStats(), loadSquareStatus(), loadFastScan(), loadCapital(), loadRiskStatus(), loadSchedule(), loadReviews(), loadChangelog()]);
   await Promise.allSettled([loadWatchlist(), loadActivity()]);
   nextRefreshTs = Date.now() + 30000;
 }

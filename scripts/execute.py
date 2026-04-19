@@ -46,7 +46,16 @@ def _check_and_record_action(action_id: str) -> bool:
     return False
 
 
-def _atr_stop(symbol: str, size_usdt: float, leverage: int, cfg: dict, sizing: dict | None = None) -> float | None:
+def _load_candidate_row(symbol: str) -> dict | None:
+    try:
+        payload = json.loads((DATA_DIR / "candidates" / "latest.json").read_text())
+        all_candidates = payload.get("candidates", []) + payload.get("short_candidates", [])
+        return next((c for c in all_candidates if c["symbol"] == symbol), None)
+    except Exception:  # noqa: BLE001
+        return None
+
+
+def _atr_stop(symbol: str, size_usdt: float, leverage: int, cfg: dict, sizing: dict | None = None, candidate_row: dict | None = None) -> float | None:
     """Compute ATR-based stop for this open. Returns None to fall back to config default."""
     risk = cfg.get("risk", {})
     multiplier = float(risk.get("atr_stop_multiplier", 0) or 0)
@@ -58,14 +67,10 @@ def _atr_stop(symbol: str, size_usdt: float, leverage: int, cfg: dict, sizing: d
     else:
         min_stop = float(risk.get("atr_stop_min_usdt", 0) or 0)
         max_stop = float(risk.get("atr_stop_max_usdt", 0) or 0)
-    try:
-        latest = DATA_DIR / "candidates" / "latest.json"
-        payload = json.loads(latest.read_text())
-        all_candidates = payload.get("candidates", []) + payload.get("short_candidates", [])
-        row = next((c for c in all_candidates if c["symbol"] == symbol), None)
-        atr_pct = float(row["atr_pct"]) if row and row.get("atr_pct") else 0.0
-    except Exception:  # noqa: BLE001
+    row = candidate_row if candidate_row is not None else _load_candidate_row(symbol)
+    if row is None:
         return None
+    atr_pct = float(row["atr_pct"]) if row.get("atr_pct") else 0.0
     if atr_pct <= 0:
         return None
     notional = size_usdt * leverage
@@ -77,23 +82,45 @@ def _atr_stop(symbol: str, size_usdt: float, leverage: int, cfg: dict, sizing: d
     return round(stop, 4)
 
 
+def _daily_loss_level(sizing: dict, risk_cfg: dict) -> tuple[str, float]:
+    """Return (level, size_multiplier) based on today's realized PnL vs equity.
+
+    Levels: none(1.0) → soft(0.5) → strict(0.25) → hard(0.0, blocks opens).
+    """
+    equity = sizing.get("equity_usdt", 0)
+    if equity <= 0:
+        return ("none", 1.0)
+    realized = daily_realized_pnl_usdt(_iter_recent_events(DAY_MS))
+    if realized >= 0:
+        return ("none", 1.0)
+    loss_pct = -realized / equity
+    hard = float(risk_cfg.get("max_daily_loss_pct", 0.60))
+    strict = float(risk_cfg.get("daily_loss_strict_pct", 0.40))
+    soft = float(risk_cfg.get("daily_loss_soft_pct", 0.20))
+    if loss_pct >= hard:
+        return ("hard", 0.0)
+    if loss_pct >= strict:
+        return ("strict", 0.25)
+    if loss_pct >= soft:
+        return ("soft", 0.50)
+    return ("none", 1.0)
+
+
 def _constraint_check(item: dict, cfg: dict, current: int, sizing: dict | None = None) -> str | None:
     """Hard constraint filter on AI decisions. Returns rejection reason or None if allowed.
 
     Runs before circuit_breaker — AI suggestions are rejected here on hard rule violations.
+    Daily loss progressive reduction is handled separately in the open loop.
     """
     cap = int(cfg["max_concurrent_positions"])
     if current >= cap:
         return f"cap_reached: {current}/{cap}"
     if sizing:
-        daily_loss_limit = sizing["max_daily_loss_usdt"]
-    else:
-        risk = cfg.get("risk", {})
-        daily_loss_limit = float(risk.get("max_daily_loss_usdt", 0) or 0)
-    if daily_loss_limit > 0:
-        realized = daily_realized_pnl_usdt(_iter_recent_events(DAY_MS))
-        if realized <= -daily_loss_limit:
-            return f"daily_loss_cap: {realized:.2f}U"
+        risk_cfg = cfg.get("risk", {})
+        level, _ = _daily_loss_level(sizing, risk_cfg)
+        if level == "hard":
+            realized = daily_realized_pnl_usdt(_iter_recent_events(DAY_MS))
+            return f"daily_loss_hard: {realized:.2f}U"
     return None
 
 
@@ -261,6 +288,11 @@ def main(decision_path: Path) -> int:
             break
 
         size = item["size_usdt"] if item.get("size_usdt") else sizing["position_size_usdt"]
+        loss_level, loss_multiplier = _daily_loss_level(sizing, cfg.get("risk", {}))
+        if loss_level != "none":
+            size = round(float(size) * loss_multiplier, 8)
+            logger.info("daily_loss_{} applied: size×{} for {}", loss_level, loss_multiplier, symbol)
+            journal.log("risk_reduction", {"symbol": symbol, "level": loss_level, "multiplier": loss_multiplier})
         if gate and gate.state == "reduce":
             size = round(float(size) * gate.size_multiplier, 8)
         leverage = item["leverage"] if item.get("leverage") else cfg["leverage"]
@@ -295,13 +327,24 @@ def main(decision_path: Path) -> int:
             break
 
         side = item.get("side", "LONG").upper()
-        max_stop_loss_usdt = _atr_stop(symbol, size, leverage, cfg, sizing=sizing)
+        candidate_row = _load_candidate_row(symbol)
+        max_stop_loss_usdt = _atr_stop(symbol, size, leverage, cfg, sizing=sizing, candidate_row=candidate_row)
         try:
             if side == "SHORT":
                 client.open_short(symbol, size, leverage, max_stop_loss_usdt=max_stop_loss_usdt)
             else:
                 client.open_long(symbol, size, leverage, max_stop_loss_usdt=max_stop_loss_usdt)
             current += 1
+            if candidate_row is not None:
+                journal.log("open_metrics", {
+                    "symbol": symbol,
+                    "price_change_pct": candidate_row.get("price_change_pct"),
+                    "oi_change_1h_pct": candidate_row.get("oi_change_1h_pct"),
+                    "oi_change_4h_pct": candidate_row.get("oi_change_4h_pct"),
+                    "pct_from_4h_high": candidate_row.get("pct_from_4h_high"),
+                    "atr_pct": candidate_row.get("atr_pct"),
+                    "gain_from_low_pct": candidate_row.get("gain_from_low_pct"),
+                })
         except Exception as e:  # noqa: BLE001
             logger.error("open failed for {}: {}", symbol, e)
             journal.log("error", {"op": "open", "symbol": symbol, "error": str(e)})

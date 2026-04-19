@@ -44,6 +44,7 @@ trap "rm -f $PIDFILE" EXIT INT TERM
   CLAUDE_BIN="${CLAUDE_BIN:-/usr/local/bin/claude}"
   if [[ -x "$NODE_BIN" && -x "$CLAUDE_BIN" ]]; then
     timeout 300 "$NODE_BIN" "$CLAUDE_BIN" -p "@CLAUDE.md run one decision cycle now" \
+      --model claude-sonnet-4-6 \
       --permission-mode acceptEdits \
       --output-format text \
     || {

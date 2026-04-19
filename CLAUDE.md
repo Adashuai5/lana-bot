@@ -24,38 +24,36 @@
    - `tail -n 30 data/journal.ndjson` — 最近事件（开仓、平仓、止损、历史决策）。从中学习。
    - `data/reviews/latest.json` — 如存在，读取 `win_rate_pct`、`profit_factor`、`daily_loss_cap_triggers` 等关键指标，作为当前决策的背景参考。
 
-2. **决策。** 对每个候选币：
-   - **做多**（`candidates`）：动量是否真实（涨幅 + OI 共振确认）？
-     - OI 上升 + 价格上涨 = 强信号。OI 上升 + 价格横盘 = 观望。OI 下降 + 价格上涨 = 轧空风险（跳过做多）。
-     - `pct_from_4h_high`：距 5h 峰值的跌幅（%）。越高越安全。< 3% 说明价格仍在峰值附近，格外谨慎。
-     - `atr_pct`：1h 平均真实波幅占价格的百分比（波动率代理）。ATR > 8% 意味着正常波动即可触发止损，需要更强的 OI 确认。
-     - `gain_from_low_pct`：从 24h 低点的涨幅。候选币可能通过此路径进入，`price_change_pct` 为负也正常——判断质量看 OI 确认和 `pct_from_4h_high`，不看 24h 净涨跌。
-   - **做空**（`short_candidates`）：价格暴涨 > 30% 但 OI 下降 = 轧空耗尽。仅在轧空明显结束时（价格趋缓、OI 持续下降）做空。需高置信度——meme 泵可能延续很长。
-   - 已持有？（如是，跳过 — 任何方向都不加仓。）
-   - 会超过 `max_concurrent_positions`（当前为 2）？
-   - 对比最近 journal：该 symbol 在过去几小时内是否已开仓或止损出局？如是，需要明显更强的信号。
-   - 现有仓位是否有平仓理由（信号消失、止盈）？注意：亏损仓位由 daemon 自动止损，不要抢跑；仅在信号恶化时手动平仓。
+2. **输出倾向。** 你的工作是对每个候选币给出信号倾向（`BUY_LIKELY` 或 `SKIP`）。**最终是否开仓由 decide.py 的硬规则裁定**，不是你直接决定。
+
+   - **做多**（`candidates`）：OI 是否真实共振？
+     - OI 上升 + 价格上涨 = 强信号 → `BUY_LIKELY`。OI 下降 + 价格上涨 = 轧空风险 → `SKIP`。
+     - `pct_from_4h_high` 越高越安全。`atr_pct > 8%` 需要更强 OI 确认。
+     - `gain_from_low_pct`：日内泵路径，`price_change_pct` 为负也正常——看 OI 和回调。
+   - **做空**（`short_candidates`）：轧空明显结束（价格趋缓 + OI 持续下降）→ `BUY_LIKELY`（SHORT 方向）。
+   - 已持有该 symbol？→ `SKIP`（不加仓）。
+   - 参考 journal（状态输入）：若该 symbol 近期止损过，倾向 `SKIP`，但仍由 decide.py 最终裁定。
+   - 现有仓位是否有平仓理由（信号消失）？亏损仓位由 monitor.py 自动止损，不要抢跑。
 
 3. **写决策文件**至 `data/decisions/{unix_ts_seconds}.json`，格式如下：
 
    ```json
    {
-     "open":  [
-       {"symbol": "RAVEUSDT", "side": "LONG", "size_usdt": null, "reason": "..."},
-       {"symbol": "ALPACAUSDT", "side": "SHORT", "size_usdt": null, "reason": "391% 轧空，OI 平稳 — 做空"}
+     "open": [
+       {"symbol": "RAVEUSDT", "side": "LONG", "size_usdt": null, "ai_signal": "BUY_LIKELY", "reason": "OI 1h+12% 共振，回调 5%"},
+       {"symbol": "ALPACAUSDT", "side": "SHORT", "size_usdt": null, "ai_signal": "BUY_LIKELY", "reason": "391% 轧空耗尽，OI 下降"}
      ],
      "close": [{"symbol": "FOOUSDT", "reason": "..."}],
      "skip_reason": "无足够干净的候选"
    }
    ```
 
-   **`size_usdt` 始终写 `null`** — execute.py 会自动根据当前净值计算正确仓位大小，不要硬编码任何数字。
-   `side` 默认为 `"LONG"`，仅对 `short_candidates` 的轧空信号使用 `"SHORT"`。
-   即使没有开仓和平仓，也要写文件（空数组 + 可读的 `skip_reason`）。
+   **`size_usdt` 始终写 `null`**。`ai_signal` 只写 `"BUY_LIKELY"`——SKIP 的候选不放入 open，写入 `skip_reason`。
+   `side` 默认 `"LONG"`，仅轧空做空用 `"SHORT"`。即使无操作也要写文件。
 
-4. **执行：**
+4. **执行（decide.py 做最终决策）：**
    ```bash
-   uv run python scripts/execute.py data/decisions/{that_ts}.json
+   uv run python scripts/decide.py data/decisions/{that_ts}.json
    ```
 
 5. **停止。** 不要徘徊，不要看图，不要再获取数据。下一个周期在 30 分钟后。
