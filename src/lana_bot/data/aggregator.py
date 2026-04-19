@@ -189,8 +189,27 @@ def build_candidates(square_mentions: dict[str, int] | None = None) -> dict:
         gap_1h = _max_counter_run(oi_1h_values)
         gap_4h = _max_counter_run(oi_values)
 
+        # Kline-based metrics: pullback from peak + ATR (fetched first to allow dynamic OI threshold)
+        pct_from_4h_high = 0.0
+        atr_pct = 0.0
+        try:
+            klines = fetch_klines(t.symbol, interval="1h", limit=5)
+            if klines:
+                peak = max(k.high for k in klines)
+                pct_from_4h_high = (peak - t.last_price) / peak * 100 if peak > 0 else 0.0
+                atr_pct = statistics.fmean(
+                    (k.high - k.low) / k.close * 100 for k in klines if k.close > 0
+                )
+        except Exception as e:  # noqa: BLE001
+            logger.warning("kline fetch failed for {}: {}", t.symbol, e)
+
+        # FOMO path: sustained pump (gain_from_low >= 50%) with tightening volatility (ATR < 15%)
+        # indicates a strong directional trend rather than noise — relax OI threshold to 2%.
+        fomo_pump = t.gain_from_low_pct >= float(filters.get("fomo_gain_from_low_pct", 50.0)) and atr_pct < float(filters.get("fomo_atr_max_pct", 15.0))
+        oi_1h_threshold = float(filters.get("fomo_oi_min_pct", 2.0)) if fomo_pump else filters["min_oi_change_1h_pct"]
+
         stage2_failed = False
-        if oi_pct_1h < filters["min_oi_change_1h_pct"]:
+        if oi_pct_1h < oi_1h_threshold:
             filter_reason_stats["stage2_low_oi_change_1h"] += 1
             stage2_failed = True
         if oi_pct_4h < min_oi_4h:
@@ -205,20 +224,6 @@ def build_candidates(square_mentions: dict[str, int] | None = None) -> dict:
         if step_volatility > max_step_vol:
             filter_reason_stats["stage2_high_oi_volatility"] += 1
             stage2_failed = True
-
-        # Kline-based metrics: pullback from peak + ATR
-        pct_from_4h_high = 0.0
-        atr_pct = 0.0
-        try:
-            klines = fetch_klines(t.symbol, interval="1h", limit=5)
-            if klines:
-                peak = max(k.high for k in klines)
-                pct_from_4h_high = (peak - t.last_price) / peak * 100 if peak > 0 else 0.0
-                atr_pct = statistics.fmean(
-                    (k.high - k.low) / k.close * 100 for k in klines if k.close > 0
-                )
-        except Exception as e:  # noqa: BLE001
-            logger.warning("kline fetch failed for {}: {}", t.symbol, e)
 
         if min_pullback_pct > 0 and pct_from_4h_high < min_pullback_pct:
             filter_reason_stats["stage2_at_peak"] += 1

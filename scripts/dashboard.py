@@ -188,6 +188,24 @@ def api_exit_stats():
     return jsonify(stats)
 
 
+@app.get("/api/reviews")
+def api_reviews():
+    review_dir = ROOT / "data" / "reviews"
+    if not review_dir.exists():
+        return jsonify([])
+    files = sorted([f for f in review_dir.glob("20*.md")], reverse=True)[:30]
+    result = []
+    for f in files:
+        result.append({"date": f.stem, "content": f.read_text()})
+    return jsonify(result)
+
+
+@app.get("/api/changelog")
+def api_changelog():
+    f = ROOT / "data" / "reviews" / "changelog.md"
+    return jsonify({"content": f.read_text() if f.exists() else ""})
+
+
 @app.post("/api/bot/collect")
 def bot_collect():
     import threading

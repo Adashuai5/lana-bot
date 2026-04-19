@@ -10,7 +10,7 @@
 - 策略：追涨 meme/小市值 USDT 永续合约的短期动量（仅做多），辅以轧空信号做空。
 - 输入：币安 24h 行情（涨幅 + 成交量）+ OI 变化 + Binance Square 提及数，已预排序为候选列表。
 - **仓位大小由 Python 自动计算**（equity × 40%，下限 5U，上限 200U），execute.py 每次开仓前从 journal 计算当前已实现净值后派生。你无需计算，也不应硬编码任何 USDT 金额。
-- 每仓止损：仓位保证金的 50%（即未实现 PnL ≤ -stop_usdt 时触发，由 monitor.py 每 10 秒执行）。
+- 每仓止损：仓位保证金的 50%（即未实现 PnL ≤ -stop_usdt 时触发，由 monitor.py 每 5 秒执行）。
 - 最多同时持有 2 个仓位。
 - **当前阶段：仅模拟交易** — `config/strategy.toml` 中 `live_trading=false`。可以适当大胆用于学习，但开仓门槛仍需真实。
 
@@ -78,7 +78,7 @@
 - 市场数据获取（collect.py）。
 - **净值感知仓位计算**：execute.py 每次开仓前从 journal 计算已实现净值，派生 position_size 和所有风控阈值（百分比逻辑，随资金自动缩放）。你不需要计算，也不应指定 size_usdt。
 - 订单执行 / 模拟成交（execute.py + simulator.py）。
-- 止损：未实现 PnL ≤ -(position_size × 50%) 时触发（monitor.py 每 10 秒执行；名义价值口径）。
+- 止损：未实现 PnL ≤ -(position_size × 50%) 时触发（monitor.py 每 5 秒执行；名义价值口径）。
 - 仓位状态（positions.py）。
 
 你的工作是在预处理数据之上做纯判断。保持简洁。
@@ -87,7 +87,7 @@
 
 ## 每周复盘模式
 
-**触发方式**：以 `"运行每周复盘"` 参数调用时进入此模式。
+**触发方式**：以 `"运行每日复盘"` 参数调用时进入此模式。
 
 1. 读取 `data/reviews/latest.json` — 绩效统计数据。
 2. 读取当前 `config/strategy.toml`。
@@ -103,7 +103,7 @@
 
 4. **禁止修改以下参数**：`leverage`、`live_trading`、`initial_capital_usdt`、`max_concurrent_positions`、`position_size_pct`、`max_stop_loss_pct_of_position`、所有 `_pct` 风控参数。
 5. 将调整后的参数**直接写入 `config/strategy.toml`**（只修改需要调整的行，不改动其他）。
-6. 将 3~5 句复盘摘要写入 `data/reviews/weekly_notes.txt`（写明修改了什么、为什么、下周关注点）。
+6. 将 3~5 句复盘摘要写入 `data/reviews/daily_notes.txt`（写明修改了什么、为什么、明天关注点）。每次覆盖写入，不追加。
 7. **停止。**
 
 **调整逻辑参考**：

@@ -19,7 +19,7 @@ from lana_bot.risk.exit_engine import evaluate_all  # noqa: E402
 from lana_bot.risk.exit_rules import ExitRuleConfig  # noqa: E402
 from lana_bot.state import journal  # noqa: E402
 
-POLL_SECONDS = 10
+POLL_SECONDS = 5
 
 
 def check_once(client, max_loss: float, exit_cfg: ExitRuleConfig) -> None:

@@ -17,7 +17,7 @@ position_size_max_usdt = 200.0
 # 单仓止损：position_size_usdt × max_stop_loss_pct_of_position
 max_stop_loss_pct_of_position = 0.50
 
-max_concurrent_positions = 10
+max_concurrent_positions = 2
 leverage = 10
 cycle_minutes = 30
 
@@ -26,10 +26,13 @@ min_24h_volume_usdt = 5_000_000
 min_24h_change_pct = 10
 min_oi_change_1h_pct = 5
 top_n_candidates = 20
-min_pullback_from_high_pct = 3.0  # skip if price within 3% of 5h high (avoid chasing peaks)
+min_pullback_from_high_pct = 4.0  # skip if price within 3% of 5h high (avoid chasing peaks)
 min_short_gain_pct = 15.0         # secondary stage1 path: accept if gain_from_24h_low >= 15% even when 24h net < 10%
 max_oi_gap_bars_1h = 2            # max consecutive counter-direction bars in 1h OI window (was ratio 0.55)
 max_oi_gap_bars_4h = 3            # max consecutive counter-direction bars in 4h OI window (was ratio 0.50)
+fomo_gain_from_low_pct = 50.0    # FOMO路径：gain_from_low >= 此值时视为持续泵
+fomo_atr_max_pct = 15.0          # FOMO路径：ATR < 此值说明波动收窄（趋势稳定）
+fomo_oi_min_pct = 2.0            # FOMO路径：放宽OI门槛至此值（正常门槛5%）
 
 [square]
 enabled = true

@@ -1,6 +1,6 @@
-"""Performance review — computes weekly stats from journal.ndjson and writes data/reviews/latest.json.
+"""Performance review — computes daily stats from journal.ndjson and writes data/reviews/latest.json.
 
-Called by scripts/review_cycle.sh before Claude weekly review.
+Called by scripts/review_cycle.sh before Claude daily review.
 """
 from __future__ import annotations
 
@@ -16,7 +16,7 @@ from lana_bot.config import DATA_DIR
 from lana_bot.equity import JOURNAL_FILE, realized_equity
 
 REVIEW_DIR = DATA_DIR / "reviews"
-PERIOD_DAYS = 7
+PERIOD_DAYS = 1
 
 
 def _iter_events(since_ts_ms: float):

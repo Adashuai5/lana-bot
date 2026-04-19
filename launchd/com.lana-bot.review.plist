@@ -22,11 +22,9 @@
         <string>/Users/ada</string>
     </dict>
 
-    <!-- 每周日凌晨 3 点触发 -->
+    <!-- 每天凌晨 3 点触发 -->
     <key>StartCalendarInterval</key>
     <dict>
-        <key>Weekday</key>
-        <integer>0</integer>
         <key>Hour</key>
         <integer>3</integer>
         <key>Minute</key>

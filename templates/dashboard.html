@@ -301,6 +301,24 @@ main { padding: 12px 20px; max-width: 1400px; margin: 0 auto; display: grid; gap
         </div>
       </div>
 
+      <!-- 复盘记录 -->
+      <div class="section" style="display:flex; flex-direction:column;">
+        <div class="section-header">
+          <div class="section-title">🔍 每日复盘记录</div>
+          <div class="section-meta" id="review-meta">每天凌晨3点自动生成</div>
+        </div>
+        <div id="review-area" style="flex:1; overflow-y:auto; max-height:320px;"></div>
+      </div>
+
+      <!-- 策略变更记录 -->
+      <div class="section" style="display:flex; flex-direction:column;">
+        <div class="section-header">
+          <div class="section-title">📝 策略参数变更记录</div>
+          <div class="section-meta">每次调参自动追加</div>
+        </div>
+        <div id="changelog-area" style="flex:1; overflow-y:auto; max-height:260px; font-size:12px; color:#555; line-height:1.8; padding:10px 14px; white-space:pre-wrap;"></div>
+      </div>
+
       <!-- Log viewer -->
       <div class="section">
         <div class="section-header">
@@ -900,8 +918,34 @@ async function loadCapital() {
     `本金${d.initial_capital_usdt}U · 已结${d.realized_pnl_usdt >= 0 ? '+' : ''}${d.realized_pnl_usdt.toFixed(2)}U`;
 }
 
+/* ─── changelog ─── */
+async function loadChangelog() {
+  const data = await fetch('/api/changelog').then(r => r.json());
+  const area = document.getElementById('changelog-area');
+  area.textContent = data.content || '暂无记录';
+}
+
+/* ─── reviews ─── */
+async function loadReviews() {
+  const reviews = await fetch('/api/reviews').then(r => r.json());
+  const area = document.getElementById('review-area');
+  if (!reviews.length) {
+    area.innerHTML = '<div class="empty-state"><p>暂无复盘记录（每天凌晨3点自动生成）</p></div>';
+    return;
+  }
+  area.innerHTML = reviews.map(r => `
+    <details style="border-bottom:1px solid #f0f0f0; padding:10px 14px;" ${r === reviews[0] ? 'open' : ''}>
+      <summary style="cursor:pointer; font-size:13px; font-weight:600; color:#374151; list-style:none; display:flex; justify-content:space-between;">
+        <span>📅 ${r.date}</span>
+        <span style="color:#6366f1; font-size:11px;">▼</span>
+      </summary>
+      <div style="margin-top:10px; font-size:12px; color:#555; line-height:1.8; white-space:pre-wrap;">${escHtml(r.content)}</div>
+    </details>
+  `).join('');
+}
+
 async function loadAll() {
-  await Promise.allSettled([loadStatus(), loadPositions(), loadPnlChart(), loadExitStats(), loadSquareStatus(), loadFastScan(), loadCapital(), loadSchedule()]);
+  await Promise.allSettled([loadStatus(), loadPositions(), loadPnlChart(), loadExitStats(), loadSquareStatus(), loadFastScan(), loadCapital(), loadSchedule(), loadReviews(), loadChangelog()]);
   await Promise.allSettled([loadWatchlist(), loadActivity()]);
   nextRefreshTs = Date.now() + 30000;
 }
