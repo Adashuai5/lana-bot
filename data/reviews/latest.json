@@ -1,26 +1,20 @@
 {
-  "generated_at": "2026-04-19T08:27:16.871542+00:00",
-  "period_days": 7,
-  "equity_usdt": 64.78,
-  "equity_vs_initial_pct": 29.6,
-  "total_trades": 11,
-  "win_rate_pct": 36.4,
-  "avg_win_usdt": 39.91,
-  "avg_loss_usdt": -20.7,
-  "profit_factor": 1.1,
-  "max_drawdown_usdt": -67.78,
-  "avg_hold_minutes": 421.3,
-  "daily_loss_cap_triggers": 2,
+  "generated_at": "2026-04-20T19:00:00.461291+00:00",
+  "period_days": 1,
+  "equity_usdt": 41.25,
+  "equity_vs_initial_pct": -17.5,
+  "total_trades": 2,
+  "win_rate_pct": 50.0,
+  "avg_win_usdt": 0.27,
+  "avg_loss_usdt": -1.38,
+  "profit_factor": 0.2,
+  "max_drawdown_usdt": -78.94,
+  "avg_hold_minutes": 360.0,
+  "daily_loss_cap_triggers": 0,
   "most_profitable_symbols": [
-    "HIGHUSDT",
-    "ALICEUSDT",
-    "NOMUSDT"
+    "IRYSUSDT"
   ],
   "most_loss_symbols": [
-    "NEIROUSDT",
-    "SIRENUSDT",
-    "VANRYUSDT",
-    "ARPAUSDT",
-    "HIGHUSDT"
+    "SPKUSDT"
   ]
 }
