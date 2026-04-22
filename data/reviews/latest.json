@@ -1,20 +1,16 @@
 {
-  "generated_at": "2026-04-20T19:00:00.461291+00:00",
+  "generated_at": "2026-04-21T19:00:00.445888+00:00",
   "period_days": 1,
   "equity_usdt": 41.25,
   "equity_vs_initial_pct": -17.5,
-  "total_trades": 2,
-  "win_rate_pct": 50.0,
-  "avg_win_usdt": 0.27,
-  "avg_loss_usdt": -1.38,
-  "profit_factor": 0.2,
+  "total_trades": 0,
+  "win_rate_pct": 0.0,
+  "avg_win_usdt": 0.0,
+  "avg_loss_usdt": 0.0,
+  "profit_factor": 0.0,
   "max_drawdown_usdt": -78.94,
-  "avg_hold_minutes": 360.0,
+  "avg_hold_minutes": 0.0,
   "daily_loss_cap_triggers": 0,
-  "most_profitable_symbols": [
-    "IRYSUSDT"
-  ],
-  "most_loss_symbols": [
-    "SPKUSDT"
-  ]
+  "most_profitable_symbols": [],
+  "most_loss_symbols": []
 }

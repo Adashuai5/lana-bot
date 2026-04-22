@@ -2,11 +2,17 @@
 # One full decision cycle: collect → ask Claude to decide → execute.
 # Called by launchd every 30 min and by fast_scan on new surge signals.
 
-export https_proxy=http://127.0.0.1:7890
-export http_proxy=http://127.0.0.1:7890
+# Proxy: prefer env vars, fallback to localhost for local dev
+export https_proxy="${HTTPS_PROXY:-http://127.0.0.1:7890}"
+export http_proxy="${HTTP_PROXY:-http://127.0.0.1:7890}"
 export PATH="/usr/local/bin:/opt/homebrew/bin:$PATH"
 
 set -euo pipefail
+
+# Binary paths: dynamic lookup with fallback
+UV_BIN="${UV_BIN:-$(command -v uv || echo /usr/local/bin/uv)}"
+NODE_BIN="${NODE_BIN:-$(command -v node || echo /usr/local/bin/node)}"
+CLAUDE_BIN="${CLAUDE_BIN:-$(command -v claude || echo /usr/local/bin/claude)}"
 
 # 动态定位脚本目录，避免写死 /Users/xxx 路径导致迁移失败。
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
@@ -23,6 +29,19 @@ CLAUDE_GUARD_FILE="$PROJECT/data/decisions/claude_guard.json"
 # 确保日志目录和 guard 数据目录存在。
 mkdir -p "$PROJECT/logs" "$PROJECT/data/decisions"
 
+# Helper: run collect.py with retries
+run_collect() {
+  local retries=2 delay=30
+  for i in $(seq 1 $retries); do
+    if "$UV_BIN" run python scripts/collect.py; then
+      return 0
+    fi
+    echo "WARN: collect.py attempt $i/$retries failed"
+    if [[ $i -lt $retries ]]; then sleep $delay; fi
+  done
+  return 1
+}
+
 # PID-file lock
 if [[ -f "$PIDFILE" ]]; then
   old_pid=$(cat "$PIDFILE" 2>/dev/null || echo "")
@@ -38,12 +57,11 @@ trap "rm -f $PIDFILE" EXIT INT TERM
 {
   echo "=== cycle start $(date -Iseconds) ==="
 
-  # 1. Collect fresh market data
-  if ! /usr/local/bin/uv run python scripts/collect.py; then
-    echo "WARN: collect.py failed (exit $?) — retrying in 30s"
-    sleep 30
-    /usr/local/bin/uv run python scripts/collect.py || \
-      echo "WARN: collect.py retry also failed — proceeding with existing candidates"
+  # 1. Collect fresh market data (strict: exit if failed)
+  if ! run_collect; then
+    echo "ERROR: collect.py failed after retries — exiting without stale data" >> "$LOG"
+    echo "=== cycle end $(date -Iseconds) ==="
+    exit 1
   fi
 
   # 2. Decide whether to call Claude
@@ -56,8 +74,8 @@ trap "rm -f $PIDFILE" EXIT INT TERM
     echo "SKIP: candidates file missing" >> "$LOG"
 
   # long 和 short 都为空 → 跳过
-  # [TOKEN-SAVE] 候选为空时不进入模型决策，避免“空跑”消耗 token。
-  elif python - "$CANDIDATES_FILE" <<'PY'
+  # [TOKEN-SAVE] 候选为空时不进入模型决策，避免"空跑"消耗 token。
+  elif "$UV_BIN" run python - "$CANDIDATES_FILE" <<'PY'
 # 这里用 JSON 解析而非 grep，避免因空格/换行格式变化导致误判。
 import json,sys
 try:
@@ -76,7 +94,7 @@ PY
   else
     # 候选数量过滤（避免低质量调用 Claude）
     # [TOKEN-SAVE] 候选总数 < 2 时，信息密度太低，直接跳过可减少低价值 token 开销。
-    COUNT=$(python - "$CANDIDATES_FILE" <<'PY'
+    COUNT=$("$UV_BIN" run python - "$CANDIDATES_FILE" <<'PY'
 # 统计 long + short 总候选数；解析失败时返回 0 走保守跳过分支。
 import json,sys
 try:
@@ -105,7 +123,7 @@ PY
       LAST_DAY=""
       DAY_COUNT=0
       if [[ -f "$CLAUDE_GUARD_FILE" ]]; then
-        GUARD_LINE=$(python - "$CLAUDE_GUARD_FILE" <<'PY'
+        GUARD_LINE=$("$UV_BIN" run python - "$CLAUDE_GUARD_FILE" <<'PY'
 # 单次读取 day_key/day_count/last_call_ts，减少多次解析的复杂度。
 import json,sys
 try:
@@ -140,9 +158,6 @@ PY
         exit 0
       fi
 
-      NODE_BIN="${NODE_BIN:-/usr/local/bin/node}"
-      CLAUDE_BIN="${CLAUDE_BIN:-/usr/local/bin/claude}"
-
       if [[ -x "$NODE_BIN" && -x "$CLAUDE_BIN" ]]; then
         # 先假定成功；若 timeout/失败由 ec 覆盖。
         ec=0
@@ -162,7 +177,7 @@ PY
         if [[ $ec -eq 0 ]]; then
           # [TOKEN-SAVE] 仅成功调用才计数，避免失败重试误占预算，确保 token 统计准确。
           NEW_COUNT=$((DAY_COUNT + 1))
-          python - "$CLAUDE_GUARD_FILE" "$DAY_KEY" "$NOW_TS" "$NEW_COUNT" <<'PY'
+          "$UV_BIN" run python - "$CLAUDE_GUARD_FILE" "$DAY_KEY" "$NOW_TS" "$NEW_COUNT" <<'PY'
 # 覆盖写入最新预算状态；字段保持最小集合便于脚本读取。
 import json,sys
 path, day_key, now_ts, day_count = sys.argv[1], sys.argv[2], int(sys.argv[3]), int(sys.argv[4])
