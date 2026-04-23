@@ -157,8 +157,8 @@ except Exception:
 PY
 )
 
-    if [[ "$COUNT" -lt 2 ]]; then
-      # 如果候选币数量小于2
+    if [[ "$COUNT" -lt 1 ]]; then
+      # 如果候选币数量小于1
       echo "SKIP: too few candidates ($COUNT), skip Claude" >> "$LOG"
       # 记录日志：候选太少，不调用AI
     else
@@ -231,7 +231,6 @@ PY
         ec=0
         # 300s 超时保护，避免外部 CLI 卡住阻塞后续周期。
         timeout 300 "$NODE_BIN" "$CLAUDE_BIN" -p "@CLAUDE.md run one decision cycle now" \
-          --model claude-sonnet-4-6 \
           --permission-mode acceptEdits \
           --output-format text \
         || {

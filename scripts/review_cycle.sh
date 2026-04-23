@@ -36,7 +36,6 @@ mkdir -p "$PROJECT/logs" "$REVIEW_DIR"
   CLAUDE_BIN="${CLAUDE_BIN:-/usr/local/bin/claude}"
   if [[ -x "$NODE_BIN" && -x "$CLAUDE_BIN" ]]; then
     CLAUDE_OUTPUT=$(timeout 300 "$NODE_BIN" "$CLAUDE_BIN" -p "@CLAUDE.md 运行每日复盘" \
-      --model claude-sonnet-4-6 \
       --permission-mode acceptEdits \
       --output-format text 2>&1) || {
       ec=$?
