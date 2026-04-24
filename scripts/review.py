@@ -71,10 +71,18 @@ def compute_stats(period_days: int = PERIOD_DAYS) -> dict:
     profit_factor = round(total_win_pnl / total_loss_pnl, 2) if total_loss_pnl > 0 else 0.0
     avg_hold = round(sum(hold_minutes) / len(hold_minutes), 1) if hold_minutes else 0.0
 
-    # Running max drawdown (from journal start, not period)
-    running_pnl = 0.0
-    peak = 0.0
-    max_dd = 0.0
+
+    import tomllib
+    with open(Path(__file__).resolve().parents[1] / "config" / "strategy.toml", "rb") as f:
+        cfg = tomllib.load(f)
+    initial = float(cfg.get("initial_capital_usdt", 50))
+    equity = realized_equity(initial)
+    equity_vs_initial = round((equity - initial) / initial * 100, 1)
+
+    # Recalculate max_drawdown correctly (from journal start, account for initial capital)
+    peak_equity = initial
+    max_dd_correct = 0.0
+    running_equity = initial
     if JOURNAL_FILE.exists():
         with JOURNAL_FILE.open() as f:
             for line in f:
@@ -83,17 +91,11 @@ def compute_stats(period_days: int = PERIOD_DAYS) -> dict:
                 except json.JSONDecodeError:
                     continue
                 if rec.get("event") == "close":
-                    running_pnl += float(rec.get("net_pnl_usdt", 0))
-                    peak = max(peak, running_pnl)
-                    dd = running_pnl - peak
-                    max_dd = min(max_dd, dd)
-
-    import tomllib
-    with open(Path(__file__).resolve().parents[1] / "config" / "strategy.toml", "rb") as f:
-        cfg = tomllib.load(f)
-    initial = float(cfg.get("initial_capital_usdt", 50))
-    equity = realized_equity(initial)
-    equity_vs_initial = round((equity - initial) / initial * 100, 1)
+                    pnl = float(rec.get("net_pnl_usdt", 0.0))
+                    running_equity += pnl
+                    peak_equity = max(peak_equity, running_equity)
+                    drawdown = running_equity - peak_equity
+                    max_dd_correct = min(max_dd_correct, drawdown)
 
     top_wins = sorted(symbol_wins.items(), key=lambda x: -x[1])[:5]
     top_losses = sorted(symbol_losses.items(), key=lambda x: x[1])[:5]
@@ -108,7 +110,7 @@ def compute_stats(period_days: int = PERIOD_DAYS) -> dict:
         "avg_win_usdt": avg_win,
         "avg_loss_usdt": avg_loss,
         "profit_factor": profit_factor,
-        "max_drawdown_usdt": round(max_dd, 2),
+        "max_drawdown_usdt": round(max_dd_correct, 2),
         "avg_hold_minutes": avg_hold,
         "daily_loss_cap_triggers": daily_loss_cap_triggers,
         "most_profitable_symbols": [s for s, _ in top_wins],

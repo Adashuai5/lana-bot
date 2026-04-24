@@ -10,7 +10,7 @@ initial_capital_usdt = 50
 # 示例（50U净值时）：position_size = 50 × 40% = 20U；stop = 20 × 50% = 10U；notional = 200U。
 
 # 仓位大小：equity × position_size_pct（下限 position_size_min_usdt，上限 position_size_max_usdt）
-position_size_pct = 0.40
+position_size_pct = 0.15
 position_size_min_usdt = 5.0
 position_size_max_usdt = 200.0
 
@@ -23,10 +23,10 @@ cycle_minutes = 30
 
 [aggregator]
 min_24h_volume_usdt = 5_000_000
-min_24h_change_pct = 10
+min_24h_change_pct = 15
 min_oi_change_1h_pct = 5
 top_n_candidates = 20
-min_pullback_from_high_pct = 4.0  # skip if price within 3% of 5h high (avoid chasing peaks)
+min_pullback_from_high_pct = 6.0  # skip if price within 3% of 5h high (avoid chasing peaks)
 min_short_gain_pct = 15.0         # secondary stage1 path: accept if gain_from_24h_low >= 15% even when 24h net < 10%
 max_oi_gap_bars_1h = 2            # max consecutive counter-direction bars in 1h OI window (was ratio 0.55)
 max_oi_gap_bars_4h = 3            # max consecutive counter-direction bars in 4h OI window (was ratio 0.50)
@@ -83,7 +83,7 @@ risk_multiple_tp_close_fraction = 0.5
 # trailing_drawdown：触发止盈后，剩余仓位回撤超过此值则强制平仓。
 # 相对于 position_size_usdt 的比例（50U净值时：20U × 15% = 3U，与旧值一致）。
 trailing_drawdown_pct = 0.15
-max_hold_seconds = 21600
+max_hold_seconds = 10800
 
 [regime]
 enabled = false
