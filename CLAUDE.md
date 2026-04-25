@@ -31,6 +31,7 @@
      - `pct_from_4h_high` 越高越安全。`atr_pct > 8%` 需要更强 OI 确认。
      - `gain_from_low_pct`：日内泵路径，`price_change_pct` 为负也正常——看 OI 和回调。
    - **做空**（`short_candidates`）：轧空明显结束（价格趋缓 + OI 持续下降）→ `BUY_LIKELY`（SHORT 方向）。
+   - **观察层**（`observation_candidates`）：仅失败 1 个 Stage 2 条件的候选，附带 `fail_reason`。**不开仓**，但若 `fail_reason` 仅涉及轻微 OI 噪声（如 `gap_4h` 略超），可在 `skip_reason` 中注明"观察：XXX"，供下一周期参考。
    - 已持有该 symbol？→ `SKIP`（不加仓）。
    - 参考 journal（状态输入）：若该 symbol 近期止损过，倾向 `SKIP`，但仍由 decide.py 最终裁定。
    - 现有仓位是否有平仓理由（信号消失）？亏损仓位由 monitor.py 自动止损，不要抢跑。
@@ -98,6 +99,8 @@
    | `[filters] min_pullback_from_high_pct` | 1 ~ 8 | 3 |
    | `[filters] top_n_candidates` | 10 ~ 50 | 20 |
    | `[exit_rules] max_hold_seconds` | 3600 ~ 43200 | 21600 |
+   | `[aggregator] max_oi_gap_bars_4h` | 3 ~ 8 | 5 |
+   | `[aggregator] max_oi_step_volatility_pct` | 1 ~ 5 | 3 |
 
 4. **禁止修改以下参数**：`leverage`、`live_trading`、`initial_capital_usdt`、`max_concurrent_positions`、`position_size_pct`、`max_stop_loss_pct_of_position`、所有 `_pct` 风控参数。
 5. 将调整后的参数**直接写入 `config/strategy.toml`**（只修改需要调整的行，不改动其他）。

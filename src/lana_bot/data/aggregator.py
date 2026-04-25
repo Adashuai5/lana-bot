@@ -175,6 +175,7 @@ def build_candidates(square_mentions: dict[str, int] | None = None) -> dict:
 
     # Stage 2: OI stability constraints + pullback filter.
     stage2_rows: list[dict[str, float | str | int]] = []
+    observation_rows: list[dict] = []  # symbols failing exactly 1 stage2 condition
     for t in prefiltered:
         try:
             oi_points = fetch_oi_history(t.symbol, period="5m", limit=49)  # ~4h
@@ -212,28 +213,42 @@ def build_candidates(square_mentions: dict[str, int] | None = None) -> dict:
         fomo_pump = t.gain_from_low_pct >= float(filters.get("fomo_gain_from_low_pct", 50.0)) and atr_pct < float(filters.get("fomo_atr_max_pct", 15.0))
         oi_1h_threshold = float(filters.get("fomo_oi_min_pct", 2.0)) if fomo_pump else filters["min_oi_change_1h_pct"]
 
-        stage2_failed = False
+        fail_reasons: list[str] = []
         if oi_pct_1h < oi_1h_threshold:
             filter_reason_stats["stage2_low_oi_change_1h"] += 1
-            stage2_failed = True
+            fail_reasons.append(f"oi_1h={oi_pct_1h:.1f}%<{oi_1h_threshold}%")
         if oi_pct_4h < min_oi_4h:
             filter_reason_stats["stage2_low_oi_change_4h"] += 1
-            stage2_failed = True
+            fail_reasons.append(f"oi_4h={oi_pct_4h:.1f}%<{min_oi_4h}%")
         if gap_1h > max_gap_1h:
             filter_reason_stats["stage2_low_continuity_1h"] += 1
-            stage2_failed = True
+            fail_reasons.append(f"gap_1h={gap_1h}>{max_gap_1h}")
         if gap_4h > max_gap_4h:
             filter_reason_stats["stage2_low_continuity_4h"] += 1
-            stage2_failed = True
+            fail_reasons.append(f"gap_4h={gap_4h}>{max_gap_4h}")
         if step_volatility > max_step_vol:
             filter_reason_stats["stage2_high_oi_volatility"] += 1
-            stage2_failed = True
-
+            fail_reasons.append(f"oi_vol={step_volatility:.1f}%>{max_step_vol}%")
         if min_pullback_pct > 0 and pct_from_4h_high < min_pullback_pct:
             filter_reason_stats["stage2_at_peak"] += 1
-            stage2_failed = True
+            fail_reasons.append(f"pullback={pct_from_4h_high:.1f}%<{min_pullback_pct}%")
 
-        if stage2_failed:
+        if fail_reasons:
+            # Only-one-condition failures go to observation tier for market awareness.
+            if len(fail_reasons) == 1:
+                observation_rows.append(
+                    {
+                        "symbol": t.symbol,
+                        "last_price": t.last_price,
+                        "price_change_pct": t.price_change_pct,
+                        "gain_from_low_pct": round(t.gain_from_low_pct, 2),
+                        "oi_change_1h_pct": oi_pct_1h,
+                        "oi_change_4h_pct": oi_pct_4h,
+                        "pct_from_4h_high": round(pct_from_4h_high, 2),
+                        "atr_pct": round(atr_pct, 2),
+                        "fail_reason": fail_reasons[0],
+                    }
+                )
             continue
 
         # Use the stronger of 24h change or gain_from_low as the trend signal.
@@ -344,11 +359,15 @@ def build_candidates(square_mentions: dict[str, int] | None = None) -> dict:
         short_candidates = short_candidates[:short_cfg.get("top_n", 5)]
         logger.info("short candidates: {}", len(short_candidates))
 
+    observation_rows.sort(key=lambda r: r["pct_from_4h_high"], reverse=True)
+    logger.info("observation candidates (1-fail): {}", len(observation_rows))
+
     return {
         "generated_at_ms": int(time.time() * 1000),
         "regime": regime,
         "count": len(top),
         "candidates": [asdict(c) for c in top],
         "short_candidates": [asdict(c) for c in short_candidates],
+        "observation_candidates": observation_rows[:10],
         "filter_reason_stats": dict(filter_reason_stats),
     }
