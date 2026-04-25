@@ -324,6 +324,9 @@ def main(decision_path: Path) -> int:
                     "breaker_details": breaker.details,
                 },
             )
+            # Symbol-scoped dimensions only affect this symbol; account-level dimensions block all.
+            if breaker.dimension.startswith("symbol_"):
+                continue
             break
 
         side = item.get("side", "LONG").upper()

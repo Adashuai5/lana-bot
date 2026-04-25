@@ -7,6 +7,7 @@ from __future__ import annotations
 import json
 import sys
 import time
+import tomllib
 from datetime import datetime, timezone
 from pathlib import Path
 
@@ -47,10 +48,13 @@ def compute_stats(period_days: int = PERIOD_DAYS) -> dict:
     for rec in _iter_events(since_ms):
         event = rec.get("event")
         if event == "close":
-            pnl = float(rec.get("net_pnl_usdt", 0.0))
+            try:
+                pnl = float(rec.get("net_pnl_usdt", 0.0))
+                held_ms = float(rec.get("held_ms", 0))
+            except (ValueError, TypeError):
+                continue
             closes.append(rec)
             sym = rec.get("symbol", "")
-            held_ms = float(rec.get("held_ms", 0))
             hold_minutes.append(held_ms / 60000)
             if pnl >= 0:
                 symbol_wins[sym] = symbol_wins.get(sym, 0) + pnl
@@ -72,7 +76,6 @@ def compute_stats(period_days: int = PERIOD_DAYS) -> dict:
     avg_hold = round(sum(hold_minutes) / len(hold_minutes), 1) if hold_minutes else 0.0
 
 
-    import tomllib
     with open(Path(__file__).resolve().parents[1] / "config" / "strategy.toml", "rb") as f:
         cfg = tomllib.load(f)
     initial = float(cfg.get("initial_capital_usdt", 50))
@@ -91,7 +94,10 @@ def compute_stats(period_days: int = PERIOD_DAYS) -> dict:
                 except json.JSONDecodeError:
                     continue
                 if rec.get("event") == "close":
-                    pnl = float(rec.get("net_pnl_usdt", 0.0))
+                    try:
+                        pnl = float(rec.get("net_pnl_usdt", 0.0))
+                    except (ValueError, TypeError):
+                        continue
                     running_equity += pnl
                     peak_equity = max(peak_equity, running_equity)
                     drawdown = running_equity - peak_equity
@@ -110,7 +116,7 @@ def compute_stats(period_days: int = PERIOD_DAYS) -> dict:
         "avg_win_usdt": avg_win,
         "avg_loss_usdt": avg_loss,
         "profit_factor": profit_factor,
-        "max_drawdown_usdt": round(max_dd_correct, 2),
+        "all_time_max_drawdown_usdt": round(max_dd_correct, 2),
         "avg_hold_minutes": avg_hold,
         "daily_loss_cap_triggers": daily_loss_cap_triggers,
         "most_profitable_symbols": [s for s, _ in top_wins],

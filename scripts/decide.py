@@ -12,6 +12,7 @@ Usage: python scripts/decide.py <decision_file>
 from __future__ import annotations
 
 import json
+import shutil
 import subprocess
 import sys
 from pathlib import Path
@@ -67,6 +68,7 @@ def main(decision_path: Path) -> int:
 
         if row is None:
             # Not in current candidates — pass through, execute.py will handle
+            journal.log("strategy_gate", {"symbol": symbol, "blocked": False, "reason": "candidate_data_missing"})
             final_open.append(item)
             continue
 
@@ -81,8 +83,9 @@ def main(decision_path: Path) -> int:
     filtered_path = decision_path.parent / f"{decision_path.stem}_gated.json"
     filtered_path.write_text(json.dumps(filtered, ensure_ascii=False))
 
+    uv_bin = shutil.which("uv") or "/usr/local/bin/uv"
     result = subprocess.run(
-        ["/usr/local/bin/uv", "run", "python", "scripts/execute.py", str(filtered_path)],
+        [uv_bin, "run", "python", "scripts/execute.py", str(filtered_path)],
         cwd=Path(__file__).resolve().parents[1],
     )
     return result.returncode
