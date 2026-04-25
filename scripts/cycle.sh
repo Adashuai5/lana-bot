@@ -163,14 +163,19 @@ PY
       # 记录日志：候选太少，不调用AI
     else
       # 候选足够，准备调用AI
-      # 预算保护：
-      # 1) 最小调用间隔（默认 45 分钟）
-      # 2) 每日最大调用次数（默认 24 次，可通过环境变量调小）
-      # [TOKEN-SAVE] 两层限流都是为了硬性控制 token 消耗上限，防止被定时+异动触发打满。
-      CLAUDE_MIN_INTERVAL_S="${CLAUDE_MIN_INTERVAL_S:-2700}"
-      # AI最小调用间隔=2700秒（45分钟）
-      CLAUDE_DAILY_MAX_CALLS="${CLAUDE_DAILY_MAX_CALLS:-24}"
-      # AI每日最大调用次数=24次
+      # 预算保护：调用间隔和日上限均从 strategy.toml 的 cycle_minutes 派生。
+      # 只需修改 strategy.toml 中的 cycle_minutes，频次自动跟随。
+      CYCLE_MINUTES=$("$UV_BIN" run python - "$PROJECT/config/strategy.toml" <<'PY'
+import tomllib, sys
+with open(sys.argv[1], "rb") as f:
+    cfg = tomllib.load(f)
+print(int(cfg.get("cycle_minutes", 30)))
+PY
+)
+      # 间隔 = cycle_minutes × 60 - 60s（比周期少 1 分钟，确保每次都能通过冷却检查）
+      CLAUDE_MIN_INTERVAL_S="${CLAUDE_MIN_INTERVAL_S:-$(( CYCLE_MINUTES * 60 - 60 ))}"
+      # 日上限 = 每天分钟数 / cycle_minutes（即每个周期都调用一次）
+      CLAUDE_DAILY_MAX_CALLS="${CLAUDE_DAILY_MAX_CALLS:-$(( 24 * 60 / CYCLE_MINUTES ))}"
       DAY_KEY=$(date -u +%F)
       # 获取当前日期（UTC）
       NOW_TS=$(date +%s)

@@ -1,103 +1,109 @@
-# Lana-bot strategy parameters
-# Edit freely; reloaded each cycle.
+# Lana-bot 策略参数
+# 每个 cycle 自动重新加载，可随时修改。
 
-live_trading = false            # MUST stay false until dry-run validation passes
-exchange = "binance"            # "binance" | "gate"
-initial_capital_usdt = 50
+live_trading = false            # 实盘开关：false = 模拟交易，验证通过前不得改为 true
+exchange = "binance"            # 交易所："binance" | "gate"
+initial_capital_usdt = 50       # 初始资金（USDT），仅用于计算起始净值，禁止修改
+
 # 仓位大小与止损均为百分比逻辑，每个 cycle 从当前净值动态派生。
 # 净值 = initial_capital_usdt + journal 中所有 close 事件的 net_pnl_usdt 之和（仅已实现）。
 # 止损口径：按"未实现PnL(USDT)"触发，PnL基于名义价值(notional)计算。
 # 示例（50U净值时）：position_size = 50 × 40% = 20U；stop = 20 × 50% = 10U；notional = 200U。
 
 # 仓位大小：equity × position_size_pct（下限 position_size_min_usdt，上限 position_size_max_usdt）
-position_size_pct = 0.40
-position_size_min_usdt = 5.0
-position_size_max_usdt = 200.0
+position_size_pct = 0.40        # 单仓占净值比例（禁止修改）
+position_size_min_usdt = 5.0    # 仓位下限（U）
+position_size_max_usdt = 200.0  # 仓位上限（U）
 
 # 单仓止损：position_size_usdt × max_stop_loss_pct_of_position
-max_stop_loss_pct_of_position = 0.50
+max_stop_loss_pct_of_position = 0.50  # 止损线 = 仓位保证金的 50%（禁止修改）
 
-max_concurrent_positions = 2
-leverage = 10
-cycle_minutes = 30
+max_concurrent_positions = 2    # 最多同时持仓数（禁止修改）
+leverage = 10                   # 杠杆倍数（禁止修改）
+cycle_minutes = 30              # 决策周期（分钟）；Claude 调用频次由此派生，改这一个值即可
 
 [aggregator]
-min_24h_volume_usdt = 5_000_000
-min_24h_change_pct = 10
-min_oi_change_1h_pct = 5
-top_n_candidates = 20
-min_pullback_from_high_pct = 4.0  # skip if price within 3% of 5h high (avoid chasing peaks)
-min_short_gain_pct = 15.0         # secondary stage1 path: accept if gain_from_24h_low >= 15% even when 24h net < 10%
-max_oi_gap_bars_1h = 2            # max consecutive counter-direction bars in 1h OI window (was ratio 0.55)
-max_oi_gap_bars_4h = 3            # max consecutive counter-direction bars in 4h OI window (was ratio 0.50)
-max_24h_change_pct = 40           # 追高上限：24h涨幅超过此值直接过滤，不进入候选
-fomo_gain_from_low_pct = 50.0    # FOMO路径：gain_from_low >= 此值时视为持续泵
-fomo_atr_max_pct = 15.0          # FOMO路径：ATR < 此值说明波动收窄（趋势稳定）
-fomo_oi_min_pct = 2.0            # FOMO路径：放宽OI门槛至此值（正常门槛5%）
+# 候选币筛选条件（stage1 过滤），可在复盘中调整
+min_24h_volume_usdt = 5_000_000        # 24h 成交量下限（5M USDT）
+min_24h_change_pct = 10                # 24h 涨幅下限（%）
+min_oi_change_1h_pct = 5               # 1h OI 变化下限（%）
+top_n_candidates = 20                  # 最多保留候选币数量
+min_pullback_from_high_pct = 6.0       # 距 5h 高点回调下限（%），低于此值视为追顶，过滤
+min_short_gain_pct = 15.0              # 做空 stage1 备用路径：gain_from_24h_low ≥ 此值也可入选
+max_oi_gap_bars_1h = 2                 # 1h OI 窗口内允许的最多反向 bar 数
+max_oi_gap_bars_4h = 3                 # 4h OI 窗口内允许的最多反向 bar 数
+max_24h_change_pct = 40                # 追高上限：24h涨幅超过此值直接过滤，不进入候选
+fomo_gain_from_low_pct = 50.0          # FOMO路径：gain_from_low >= 此值时视为持续泵
+fomo_atr_max_pct = 15.0                # FOMO路径：ATR < 此值说明波动收窄（趋势稳定）
+fomo_oi_min_pct = 2.0                  # FOMO路径：放宽OI门槛至此值（正常门槛5%）
 
 [strategy]
 # 硬门槛：decide.py 唯一决策入口，AI BUY_LIKELY + 规则通过 → 开仓
-min_price_change_pct = 10     # 24h 涨幅下限
+min_price_change_pct = 10     # 24h 涨幅下限（%）
 max_price_change_pct = 40     # 24h 涨幅上限（与 [aggregator].max_24h_change_pct 一致，独立双保险）
-min_oi_change_1h_pct = 5      # 1h OI 变化下限
-min_pct_from_4h_high = 3      # 距峰值回调下限（%）
+min_oi_change_1h_pct = 5      # 1h OI 变化下限（%）
+min_pct_from_4h_high = 3      # 距 4h 峰值回调下限（%）
 
 [square]
+# Binance Square 热度数据
 enabled = true
-top_n_trending = 20
+top_n_trending = 20            # 抓取热榜前 N 个币
 
 [fast_scan]
-surge_pct       = 15.0        # 触发阈值：24h涨幅 OR gain_from_low 超过此值视为异动
-short_surge_pct = 15.0        # gain_from_low 专用阈值（可单独调低以更敏感地捕捉日内泵）
-surge_vol_usdt  = 20_000_000  # 最低成交量门槛（20M USDT）
+# 快速扫描：异动触发额外 cycle（不受 cycle_minutes 限制）
+surge_pct       = 15.0         # 触发阈值：24h涨幅 OR gain_from_low 超过此值视为异动
+short_surge_pct = 15.0         # gain_from_low 专用阈值（可单独调低以更敏感地捕捉日内泵）
+surge_vol_usdt  = 20_000_000   # 最低成交量门槛（20M USDT）
 
 [short_filters]
+# 轧空做空候选筛选
 enabled = true
-min_squeeze_pct = 30.0          # price gain threshold to consider squeeze fade short
-min_volume_usdt = 5_000_000
-top_n = 5
+min_squeeze_pct = 30.0         # 做空入场门槛：24h 涨幅 ≥ 此值才考虑轧空衰退
+min_volume_usdt = 5_000_000    # 成交量下限（5M USDT）
+top_n = 5                      # 最多保留做空候选数
 
 [risk]
-# Account-level circuit breakers. Evaluated pre-open in execute.py.
-# Set any to 0 to disable that gate.
+# 账户级风控断路器，在 execute.py 开仓前校验。设为 0 则禁用对应门槛。
 # 日亏上限和未实现回撤上限：均为当前净值的百分比，随净值自动缩放。
 # 50U净值时：max_daily_loss = 50 × 60% = 30U；max_unrealized_drawdown = 50 × 40% = 20U（与旧值一致）。
 # 递进式日亏风控：soft → strict → hard，不一刀切封禁
 daily_loss_soft_pct = 0.20    # 亏损 > 20% 净值：仓位×0.5
 daily_loss_strict_pct = 0.40  # 亏损 > 40% 净值：仓位×0.25
 max_daily_loss_pct = 0.60     # 亏损 > 60% 净值：禁止新开仓（平仓不受影响）
-max_unrealized_drawdown_pct = 0.40
-max_sector_exposure_pct = 0      # 禁用：200U notional vs 50U capital 始终触发，真实保护来自止损
-max_daily_opens = 12            # 24h 最多开仓次数
-stop_loss_cooldown_min = 0      # 账户级SL冷却（禁用；单symbol级别见下方）
-max_daily_sl_per_symbol = 2     # 单symbol：今日SL ≥ N 次 → 全天封禁
-symbol_sl_cooldown_min = 90     # 单symbol：任意SL后冷却分钟数
-atr_stop_multiplier = 1.5       # stop = 1.5 × ATR × notional；设为0则仅用固定止损
-# ATR止损范围：相对于 position_size_usdt 的比例（50U净值时：8U-14U，与旧值一致）
+max_unrealized_drawdown_pct = 0.40  # 未实现回撤上限（占净值比）
+max_sector_exposure_pct = 0         # 禁用：200U notional vs 50U capital 始终触发，真实保护来自止损
+max_daily_opens = 12                # 24h 最多开仓次数
+stop_loss_cooldown_min = 0          # 账户级SL冷却（禁用；单symbol级别见下方）
+max_daily_sl_per_symbol = 2         # 单symbol：今日SL ≥ N 次 → 全天封禁
+symbol_sl_cooldown_min = 90         # 单symbol：任意SL后冷却分钟数
+atr_stop_multiplier = 0.8           # stop = 0.8 × ATR × notional；设为0则仅用固定止损
+# ATR止损范围：相对于 position_size_usdt 的比例，上限与固定止损对齐防止ATR过宽
 atr_stop_min_pct_of_position = 0.40
-atr_stop_max_pct_of_position = 0.70
+atr_stop_max_pct_of_position = 0.50
 
 [exit_rules]
-risk_multiple_tp = 1.5
-risk_multiple_tp_close_fraction = 0.5
+# 出场规则
+risk_multiple_tp = 1.5                  # 止盈触发：盈利达到止损金额的 1.5 倍时部分平仓
+risk_multiple_tp_close_fraction = 0.5   # 触发止盈时平掉仓位的 50%
 # trailing_drawdown：触发止盈后，剩余仓位回撤超过此值则强制平仓。
 # 相对于 position_size_usdt 的比例（50U净值时：20U × 15% = 3U，与旧值一致）。
 trailing_drawdown_pct = 0.15
-max_hold_seconds = 21600
+max_hold_seconds = 21600                # 最长持仓时间（秒）：21600 = 6小时
 
 [regime]
+# 市场状态过滤（当前禁用）
 enabled = false
 execute_gate_enabled = false
-reduce_size_multiplier = 0.5
+reduce_size_multiplier = 0.5    # 降级模式下仓位缩减倍数
 
-trend_lookback_bars_4h = 30
-trend_drift_up_pct_4h = 0.02
-trend_drift_down_pct_4h = 0.02
+trend_lookback_bars_4h = 30     # 趋势判断回看 K 线数（4h）
+trend_drift_up_pct_4h = 0.02    # 上升趋势阈值
+trend_drift_down_pct_4h = 0.02  # 下降趋势阈值
 
-breadth_allow_min = 0.52
-breadth_reduce_min = 0.45
+breadth_allow_min = 0.52        # 市场宽度：≥ 此值允许开仓
+breadth_reduce_min = 0.45       # 市场宽度：< 此值降级仓位
 
-vol_window_hours = 24
-vol_history_hours = 336
-vol_allow_quantile_max = 0.75
-vol_reduce_quantile_max = 0.90
+vol_window_hours = 24           # 波动率计算窗口（小时）
+vol_history_hours = 336         # 波动率历史参考窗口（336h = 14天）
+vol_allow_quantile_max = 0.75   # 波动率分位数上限：≤ 此值允许开仓
+vol_reduce_quantile_max = 0.90  # 波动率分位数上限：≤ 此值降级，> 此值禁止开仓
