@@ -236,6 +236,7 @@ PY
         ec=0
         # 300s 超时保护，避免外部 CLI 卡住阻塞后续周期。
         timeout 300 "$NODE_BIN" "$CLAUDE_BIN" -p "@CLAUDE.md run one decision cycle now" \
+          --model claude-haiku-4-5-20251001 \
           --permission-mode acceptEdits \
           --output-format text \
         || {

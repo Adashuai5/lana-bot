@@ -94,6 +94,17 @@ def api_square_status():
     return jsonify(get_square_status())
 
 
+@app.get("/api/network-status")
+def api_network_status():
+    f = ROOT / "data" / "network_status.json"
+    if not f.exists():
+        return jsonify({"ip": None, "changed": False, "prev_ip": None, "ts": None})
+    try:
+        return jsonify(json.loads(f.read_text()))
+    except Exception:
+        return jsonify({"ip": None, "changed": False, "prev_ip": None, "ts": None})
+
+
 @app.get("/api/capital")
 def api_capital():
     """Total equity = initial_capital + realized PnL + unrealized PnL."""

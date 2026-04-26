@@ -224,6 +224,10 @@ main { padding: 12px 20px; max-width: 1400px; margin: 0 auto; display: grid; gap
   <span style="color:#92400e; margin-left:6px; font-size:12px">→ F12 → Network → 复制 Cookie → 粘贴到 config/square_cookie.txt</span>
 </div>
 
+<div id="network-banner" style="display:none; background:#1e1b4b; color:#c7d2fe; padding:10px 24px; font-size:13px; border-bottom:1px solid #3730a3;">
+  🌐 <span id="network-banner-text"></span>
+</div>
+
 <main>
 
   <!-- Two-column master layout: left=content, right=activity -->
@@ -903,6 +907,22 @@ async function loadFastScan() {
   }
 }
 
+/* ─── network status ─── */
+async function loadNetworkStatus() {
+  try {
+    const n = await fetch('/api/network-status').then(r => r.json());
+    const banner = document.getElementById('network-banner');
+    const text   = document.getElementById('network-banner-text');
+    if (n.changed) {
+      const ago = n.ts ? Math.round((Date.now()/1000 - n.ts) / 60) + ' 分钟前' : '';
+      text.textContent = `VPN 出口 IP 已变化（${n.prev_ip} → ${n.ip}）${ago}，币安 API 可能触发风控，建议检查 VPN 节点。`;
+      banner.style.display = 'block';
+    } else {
+      banner.style.display = 'none';
+    }
+  } catch (_) {}
+}
+
 /* ─── square status ─── */
 async function loadSquareStatus() {
   const s = await fetch('/api/square-status').then(r => r.json());
@@ -976,7 +996,7 @@ async function loadReviews() {
 }
 
 async function loadAll() {
-  await Promise.allSettled([loadStatus(), loadPositions(), loadPnlChart(), loadExitStats(), loadSquareStatus(), loadFastScan(), loadCapital(), loadRiskStatus(), loadSchedule(), loadReviews(), loadChangelog()]);
+  await Promise.allSettled([loadStatus(), loadPositions(), loadPnlChart(), loadExitStats(), loadSquareStatus(), loadNetworkStatus(), loadFastScan(), loadCapital(), loadRiskStatus(), loadSchedule(), loadReviews(), loadChangelog()]);
   await Promise.allSettled([loadWatchlist(), loadActivity()]);
   nextRefreshTs = Date.now() + 30000;
 }
