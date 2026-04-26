@@ -7,6 +7,8 @@ export PATH="/usr/local/bin:/opt/homebrew/bin:$PATH"
 
 set -euo pipefail
 
+TRIGGER_TYPE="${1:-daily}"  # "5trades" 或 "daily"
+
 PROJECT="/Users/ada/lana-bot"
 cd "$PROJECT"
 
@@ -14,7 +16,16 @@ LOG="$PROJECT/logs/review.log"
 REVIEW_DIR="$PROJECT/data/reviews"
 TOML="$PROJECT/config/strategy.toml"
 DATE=$(date +%Y-%m-%d)
-REVIEW_MD="$REVIEW_DIR/${DATE}.md"
+if [[ "$TRIGGER_TYPE" == "5trades" ]]; then
+  HHMM=$(date +%H%M)
+  REVIEW_MD="$REVIEW_DIR/${DATE}_5trades_${HHMM}.md"
+  REVIEW_TITLE="复盘记录 ${DATE}（满5笔条件复盘）"
+  NOTES_HEADER="【${DATE}（满5笔条件复盘）】"
+else
+  REVIEW_MD="$REVIEW_DIR/${DATE}.md"
+  REVIEW_TITLE="复盘记录 ${DATE}"
+  NOTES_HEADER="【${DATE}】"
+fi
 
 mkdir -p "$PROJECT/logs" "$REVIEW_DIR"
 
@@ -35,7 +46,13 @@ mkdir -p "$PROJECT/logs" "$REVIEW_DIR"
   NODE_BIN="${NODE_BIN:-/usr/local/bin/node}"
   CLAUDE_BIN="${CLAUDE_BIN:-/usr/local/bin/claude}"
   if [[ -x "$NODE_BIN" && -x "$CLAUDE_BIN" ]]; then
-    CLAUDE_OUTPUT=$(timeout 300 "$NODE_BIN" "$CLAUDE_BIN" -p "@CLAUDE.md 运行每日复盘" \
+    REVIEW_PROMPT="@CLAUDE.md 运行每日复盘"
+    if [[ "$TRIGGER_TYPE" == "5trades" ]]; then
+      REVIEW_PROMPT="${REVIEW_PROMPT}
+本次复盘触发类型：满5笔条件复盘（非每日定时）。
+在 daily_notes.txt 中请使用日期头：${NOTES_HEADER}"
+    fi
+    CLAUDE_OUTPUT=$(timeout 300 "$NODE_BIN" "$CLAUDE_BIN" -p "$REVIEW_PROMPT" \
       --permission-mode acceptEdits \
       --output-format text 2>&1) || {
       ec=$?
@@ -55,7 +72,7 @@ mkdir -p "$PROJECT/logs" "$REVIEW_DIR"
 
   # 5. 写入每日复盘 md
   {
-    echo "# 复盘记录 ${DATE}"
+    echo "# ${REVIEW_TITLE}"
     echo ""
     echo "**时间**：$(date '+%Y-%m-%d %H:%M:%S')"
     echo ""

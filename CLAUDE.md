@@ -88,9 +88,13 @@
 
 **触发方式**：以 `"运行每日复盘"` 参数调用时进入此模式。
 
-1. 读取 `data/reviews/latest.json` — 绩效统计数据。
-2. 读取当前 `config/strategy.toml`。
-3. 在以下安全边界内调整参数：
+1. 读取以下输入：
+   - `data/reviews/latest.json` — 绩效统计数据。
+   - `config/strategy.toml` — 当前参数值。
+   - `data/reviews/changelog.md` 最近 20 条变更记录 — **了解各参数的调整历史，开始调整前必须查阅**。
+   - `data/reviews/daily_notes.txt` 最近内容 — 了解近期推理背景。
+
+2. 在以下安全边界内调整参数：
 
    | 参数 | 可调范围 | 默认值 |
    |------|---------|--------|
@@ -102,9 +106,20 @@
    | `[aggregator] max_oi_gap_bars_4h` | 3 ~ 8 | 5 |
    | `[aggregator] max_oi_step_volatility_pct` | 1 ~ 5 | 3 |
 
-4. **禁止修改以下参数**：`leverage`、`live_trading`、`initial_capital_usdt`、`max_concurrent_positions`、`position_size_pct`、`max_stop_loss_pct_of_position`、所有 `_pct` 风控参数。
-5. 将调整后的参数**直接写入 `config/strategy.toml`**（只修改需要调整的行，不改动其他）。
-6. 将 3~5 句复盘摘要写入 `data/reviews/daily_notes.txt`（写明修改了什么、为什么、明天关注点）。每次覆盖写入，不追加。
+3. **禁止修改以下参数**：`leverage`、`live_trading`、`initial_capital_usdt`、`max_concurrent_positions`、`position_size_pct`、`max_stop_loss_pct_of_position`、所有 `_pct` 风控参数。
+4. 将调整后的参数**直接写入 `config/strategy.toml`**（只修改需要调整的行，不改动其他）。
+5. 将复盘摘要**追加**（不覆盖）到 `data/reviews/daily_notes.txt`，格式：
+   ```
+   【YYYY-MM-DD】
+   （3~5 句：修改了什么、为什么、明天关注点）
+   ```
+6. 将本次参数变更**追加**到 `data/reviews/changelog.md`，格式：
+   ```markdown
+   ## YYYY-MM-DD（每日复盘）
+   **参数名**: 旧值 → 新值
+   - 原因：一句话说明
+   ```
+   若本次无参数变更，写 `## YYYY-MM-DD — 无调整，原因：...`
 7. **停止。**
 
 **调整逻辑参考**：
@@ -112,7 +127,14 @@
 - `daily_loss_cap_triggers ≥ 3` → 缩短 `max_hold_seconds`（避免持仓太久遭遇反转）。
 - `avg_hold_minutes < 30` → 提高 `min_pullback_from_high_pct`（避免追顶噪音开仓）。
 - `equity_vs_initial_pct > 50%` → 可适当放松过滤条件，捕捉更多机会。
-- 若数据不足（`total_trades < 5`）→ 保持当前参数不变，在 weekly_notes 中说明。
+- 若数据不足（`total_trades < 5`）→ 保持当前参数不变，在 daily_notes 中说明。
+
+**参数调整冷静期**：同一参数若在最近 5 笔交易（`close` 事件）内已被调整过，**禁止再次调整**。判断方式：查 changelog.md 找到该参数上次调整时间，再统计 journal 中该时间之后的 `close` 事件数（参考 `scripts/review.py` 中现有的 close 事件统计逻辑）。满 5 笔后方可重新评估。
+
+**参数震荡防护**：调整任意参数前，先查阅 changelog.md 中该参数的历史变更。若该参数在过去 14 天内已被改动 ≥ 2 次，必须：
+1. 在 daily_notes 中说明"上次从 X 改到 Y 的原因是 Z，这次不同因为..."
+2. 要求更强的数据支撑（win_rate 变化 > 15%，或 profit_factor 变化 > 0.3）才能再次改动
+3. 若无法提供更强支撑，保持当前值不变，注明"观察期"
 
 ## 风险降级规则（重要）
 

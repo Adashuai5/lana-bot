@@ -1,15 +1,13 @@
 复盘日期：2026-04-26
 
 【本日绩效】
-总交易次数：1（样本不足，< 5），无法做统计推断，所有参数保持不变。
-唯一亏损：ZBTUSDT，止损 -17.97 USDT，净值从 57.13U 跌至 39.15U（-21.7%）。
-avg_hold_minutes = 6.8，极短，说明开仓后快速触达止损，疑似入场时机偏激进（回调不足或入场追高）。
+近期5笔已平仓交易（BUSDT×2、ORCA、SOMI、RAYSOL），胜率约20%，profit_factor≈0.35，远低于盈利基准。唯一盈利ORCA由trailing_tp触发（+7.77U），亏损主因为SOMI和RAYSOL的hard_sl（atr均>7%，名义止损区间过宽）。
 
-【未调整原因】
-total_trades = 1，低于统计可信下限（5 笔），按策略规则不做参数调整。
-下次复盘若 avg_hold_minutes 持续 < 30 分钟且样本 ≥ 5，应将 min_pullback_from_high_pct 从 3.0 上调至 4.0~5.0，以避免追顶噪音开仓。
+【调整内容】
+- min_oi_change_1h_pct: 5 → 7（aggregator + strategy 双层），要求更强OI动量确认，减少弱信号开仓。
+- min_pullback_from_high_pct: 3 → 4（aggregator + strategy 双层），避免在高点附近追入、降低入场风险。
 
 【明天关注点】
-1. 观察新仓位入场回调深度是否达到 min_pullback_from_high_pct（3%），当前门槛偏低，入场质量是关键。
-2. ZBTUSDT 已触发止损，symbol_sl_cooldown（90 分钟）和 max_daily_sl_per_symbol（2 次）应封禁该 symbol，确认机制生效。
-3. 当前净值 39.15U，单仓保证金约 15.66U，需确保 execute.py 净值计算基于最新 journal 数据正确派生。
+1. 新过滤参数是否有效减少低质量候选（LINEAUSDT/ILVUSDT等多周期pullback不足的重复观察信号）。
+2. SONICUSDT当前仓位走向，OI 1h+37.9% 信号强，但处于降级模式下。
+3. 降级模式下profit_factor是否因减少噪音开仓而改善，目标恢复到 ≥ 1.0 以退出降级。

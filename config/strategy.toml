@@ -26,9 +26,9 @@ cycle_minutes = 30              # 决策周期（分钟）；Claude 调用频次
 # 候选币筛选条件（stage1 过滤），可在复盘中调整
 min_24h_volume_usdt = 5_000_000        # 24h 成交量下限（5M USDT）
 min_24h_change_pct = 10                # 24h 涨幅下限（%）
-min_oi_change_1h_pct = 5               # 1h OI 变化下限（%）
+min_oi_change_1h_pct = 7               # 1h OI 变化下限（%）
 top_n_candidates = 20                  # 最多保留候选币数量
-min_pullback_from_high_pct = 3.0       # 距 5h 高点回调下限（%），低于此值视为追顶，过滤
+min_pullback_from_high_pct = 4.0       # 距 5h 高点回调下限（%），低于此值视为追顶，过滤
 min_short_gain_pct = 15.0              # 做空 stage1 备用路径：gain_from_24h_low ≥ 此值也可入选
 max_oi_gap_bars_1h = 2                 # 1h OI 窗口内允许的最多反向 bar 数
 max_oi_gap_bars_4h = 5                 # 4h OI 窗口内允许的最多反向 bar 数（49根5m bar，自然噪声需要容忍）
@@ -42,8 +42,8 @@ max_oi_step_volatility_pct = 3.0       # OI逐步波动率上限（%），超过
 # 硬门槛：decide.py 唯一决策入口，AI BUY_LIKELY + 规则通过 → 开仓
 min_price_change_pct = 10     # 24h 涨幅下限（%）
 max_price_change_pct = 40     # 24h 涨幅上限（与 [aggregator].max_24h_change_pct 一致，独立双保险）
-min_oi_change_1h_pct = 5      # 1h OI 变化下限（%）
-min_pct_from_4h_high = 3      # 距 4h 峰值回调下限（%）
+min_oi_change_1h_pct = 7      # 1h OI 变化下限（%）
+min_pct_from_4h_high = 4      # 距 4h 峰值回调下限（%）
 
 [square]
 # Binance Square 热度数据

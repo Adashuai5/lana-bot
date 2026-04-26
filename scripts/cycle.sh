@@ -273,6 +273,26 @@ PY
     fi
   fi
 
+  # 条件复盘：每满5笔平仓触发一次
+  {
+    TRADES_STATE_FILE="/tmp/lana_last_review_trades"
+    CURRENT_TRADES=$(grep -c '"event":"close"' "$PROJECT/data/journal.ndjson" 2>/dev/null || echo 0)
+
+    if [[ ! -f "$TRADES_STATE_FILE" ]]; then
+      echo "$CURRENT_TRADES" > "$TRADES_STATE_FILE"
+      echo "INFO: 条件复盘状态初始化，当前平仓数=$CURRENT_TRADES"
+    else
+      LAST_TRADES=$(cat "$TRADES_STATE_FILE" 2>/dev/null || echo 0)
+      DIFF_TRADES=$(( CURRENT_TRADES - LAST_TRADES ))
+      echo "INFO: 条件复盘检查 — 当前=$CURRENT_TRADES 上次=$LAST_TRADES 差值=$DIFF_TRADES"
+      if [[ "$DIFF_TRADES" -ge 5 ]]; then
+        echo "INFO: 满5笔，触发条件复盘"
+        echo "$CURRENT_TRADES" > "$TRADES_STATE_FILE"
+        bash "$SCRIPT_DIR/review_cycle.sh" 5trades || echo "WARN: 条件复盘执行失败（不影响主流程）"
+      fi
+    fi
+  } || true
+
   echo "=== cycle end $(date -Iseconds) ==="
   # 决策周期结束，打印日志
 } >> "$LOG" 2>&1
